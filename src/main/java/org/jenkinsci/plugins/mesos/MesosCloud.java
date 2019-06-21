@@ -83,7 +83,8 @@ public class MesosCloud extends Cloud {
   @Deprecated
   private transient String secret;
   private final boolean checkpoint; // Set true to enable checkpointing. False by default.
-  private boolean onDemandRegistration; // If set true, this framework disconnects when there are no builds in the queue and re-registers when there are.
+  private boolean onDemandRegistration; // If set true, this framework disconnects when there are no builds in the queue
+                                        // and re-registers when there are.
   private boolean nfsRemoteFSRoot;
   private String jenkinsURL;
   private String declineOfferDuration;
@@ -100,11 +101,12 @@ public class MesosCloud extends Cloud {
 
   /**
    * We want to start the Mesos scheduler as part of the initialization of Jenkins
-   * and after the cloud class values have been restored from persistence.If this is
-   * the very first time, this method will be NOOP as MesosCloud is not registered yet.
+   * and after the cloud class values have been restored from persistence.If this
+   * is the very first time, this method will be NOOP as MesosCloud is not
+   * registered yet.
    */
 
-  @Initializer(after=InitMilestone.JOB_LOADED)
+  @Initializer(after = InitMilestone.JOB_LOADED)
   public static void init() {
 
     Jenkins jenkins = getJenkins();
@@ -117,9 +119,9 @@ public class MesosCloud extends Cloud {
     // setNodes() -> updateComputerList() -> updateComputer().
     Jenkins.AUTOMATIC_SLAVE_LAUNCH = false;
     for (Node n : slaves) {
-      //Remove all slaves that were persisted when Jenkins shutdown.
+      // Remove all slaves that were persisted when Jenkins shutdown.
       if (n instanceof MesosSlave) {
-        ((MesosSlave)n).terminate();
+        ((MesosSlave) n).terminate();
       }
     }
 
@@ -127,10 +129,10 @@ public class MesosCloud extends Cloud {
     Jenkins.AUTOMATIC_SLAVE_LAUNCH = true;
 
     for (Cloud c : jenkins.clouds) {
-      if( c instanceof MesosCloud) {
+      if (c instanceof MesosCloud) {
         // Register mesos framework on init, if on demand registration is not enabled.
         if (!((MesosCloud) c).isOnDemandRegistration()) {
-          ((MesosCloud)c).restartMesos();
+          ((MesosCloud) c).restartMesos();
         }
       }
     }
@@ -146,51 +148,25 @@ public class MesosCloud extends Cloud {
   }
 
   @DataBoundConstructor
-  public MesosCloud(
-      String nativeLibraryPath,
-      String master,
-      String description,
-      String frameworkName,
-      String role,
-      String slavesUser,
-      String credentialsId,
-      String principal,
-      String secret,
-      List<MesosSlaveInfo> slaveInfos,
-      boolean checkpoint,
-      boolean onDemandRegistration,
-      boolean nfsRemoteFSRoot,
-      String jenkinsURL,
-      String declineOfferDuration,
-      String cloudID) throws NumberFormatException {
-    this("MesosCloud", nativeLibraryPath, master, description, frameworkName, role,
-         slavesUser, credentialsId, principal, secret, slaveInfos, checkpoint, onDemandRegistration,
-            nfsRemoteFSRoot, jenkinsURL, declineOfferDuration, cloudID);
+  public MesosCloud(String nativeLibraryPath, String master, String description, String frameworkName, String role,
+      String slavesUser, String credentialsId, String principal, String secret, List<MesosSlaveInfo> slaveInfos,
+      boolean checkpoint, boolean onDemandRegistration, boolean nfsRemoteFSRoot, String jenkinsURL,
+      String declineOfferDuration, String cloudID) throws NumberFormatException {
+    this("MesosCloud", nativeLibraryPath, master, description, frameworkName, role, slavesUser, credentialsId,
+        principal, secret, slaveInfos, checkpoint, onDemandRegistration, nfsRemoteFSRoot, jenkinsURL,
+        declineOfferDuration, cloudID);
   }
 
   /**
    * Constructor, which also allows to specify a custom name.
+   * 
    * @throws NumberFormatException Numeric parameter parsing error
    * @since 0.9.0
    */
-  protected MesosCloud(
-      String cloudName,
-      String nativeLibraryPath,
-      String master,
-      String description,
-      String frameworkName,
-      String role,
-      String slavesUser,
-      String credentialsId,
-      String principal,
-      String secret,
-      List<MesosSlaveInfo> slaveInfos,
-      boolean checkpoint,
-      boolean onDemandRegistration,
-      boolean nfsRemoteFSRoot,
-      String jenkinsURL,
-      String declineOfferDuration,
-      String cloudID) throws NumberFormatException {
+  protected MesosCloud(String cloudName, String nativeLibraryPath, String master, String description,
+      String frameworkName, String role, String slavesUser, String credentialsId, String principal, String secret,
+      List<MesosSlaveInfo> slaveInfos, boolean checkpoint, boolean onDemandRegistration, boolean nfsRemoteFSRoot,
+      String jenkinsURL, String declineOfferDuration, String cloudID) throws NumberFormatException {
     super(cloudName);
 
     this.nativeLibraryPath = nativeLibraryPath;
@@ -210,28 +186,29 @@ public class MesosCloud extends Cloud {
     this.setJenkinsURL(jenkinsURL);
     this.setDeclineOfferDuration(declineOfferDuration);
     this.setCloudID(cloudID);
-    if(!onDemandRegistration || Mesos.getInstance(this).isSchedulerRunning()) {
-	    JenkinsScheduler.SUPERVISOR_LOCK.lock();
-	    try {
-	      restartMesos();
-	    } finally {
-	      JenkinsScheduler.SUPERVISOR_LOCK.unlock();
-	    }
+    if (!onDemandRegistration || Mesos.getInstance(this).isSchedulerRunning()) {
+      JenkinsScheduler.SUPERVISOR_LOCK.lock();
+      try {
+        restartMesos();
+      } finally {
+        JenkinsScheduler.SUPERVISOR_LOCK.unlock();
+      }
     }
   }
 
   /**
-   * Copy constructor.
-   * Allows to create copies of the original mesos cloud. Since it's a singleton
-   * by design, this method also allows specifying a new name.
-   * @param name Name of the cloud to be created
+   * Copy constructor. Allows to create copies of the original mesos cloud. Since
+   * it's a singleton by design, this method also allows specifying a new name.
+   * 
+   * @param name   Name of the cloud to be created
    * @param source Source Mesos cloud implementation
    * @since 0.9.0
    */
   public MesosCloud(@Nonnull String name, @Nonnull MesosCloud source) {
-      this(name, source.nativeLibraryPath, source.master, source.description, source.frameworkName,
-           source.role, source.slavesUser, source.credentialsId, source.principal, source.secret, source.slaveInfos,
-           source.checkpoint, source.onDemandRegistration, source.nfsRemoteFSRoot, source.jenkinsURL, source.declineOfferDuration, source.cloudID);
+    this(name, source.nativeLibraryPath, source.master, source.description, source.frameworkName, source.role,
+        source.slavesUser, source.credentialsId, source.principal, source.secret, source.slaveInfos, source.checkpoint,
+        source.onDemandRegistration, source.nfsRemoteFSRoot, source.jenkinsURL, source.declineOfferDuration,
+        source.cloudID);
   }
 
   @Override
@@ -308,8 +285,7 @@ public class MesosCloud extends Cloud {
     int result = 1;
     result = prime * result + (checkpoint ? 1231 : 1237);
     result = prime * result + ((credentialsId == null) ? 0 : credentialsId.hashCode());
-    result =
-        prime * result + ((declineOfferDuration == null) ? 0 : declineOfferDuration.hashCode());
+    result = prime * result + ((declineOfferDuration == null) ? 0 : declineOfferDuration.hashCode());
     result = prime * result + ((description == null) ? 0 : description.hashCode());
     result = prime * result + ((frameworkName == null) ? 0 : frameworkName.hashCode());
     result = prime * result + ((jenkinsURL == null) ? 0 : jenkinsURL.hashCode());
@@ -329,8 +305,9 @@ public class MesosCloud extends Cloud {
     // Default to root URL in Jenkins global configuration.
     String jenkinsRootURL = getJenkins().getRootUrl();
 
-    // If 'jenkinsURL' parameter is provided in mesos plugin configuration, then that should take precedence.
-    if(StringUtils.isNotBlank(jenkinsURL)) {
+    // If 'jenkinsURL' parameter is provided in mesos plugin configuration, then
+    // that should take precedence.
+    if (StringUtils.isNotBlank(jenkinsURL)) {
       jenkinsRootURL = jenkinsURL;
     }
 
@@ -349,10 +326,9 @@ public class MesosCloud extends Cloud {
       Metrics.metricRegistry().counter("mesos.cloud.restartMesos").inc();
     } else {
       Mesos.getInstance(this).updateScheduler(jenkinsRootURL, this);
-      if(onDemandRegistration) {
+      if (onDemandRegistration) {
         LOGGER.info("On-demand framework registration is enabled for future builds");
-      }
-      else {
+      } else {
         LOGGER.info("Mesos master has not changed, leaving the scheduler running");
       }
     }
@@ -368,15 +344,14 @@ public class MesosCloud extends Cloud {
   }
 
   private static void initNativeLibrary(String nativeLibraryPath) {
-    if(!nativeLibraryLoaded) {
+    if (!nativeLibraryLoaded) {
       // First, we attempt to load the library from the given path.
       // If unsuccessful, we attempt to load using 'MesosNativeLibrary.load()'.
       try {
-          MesosNativeLibrary.load(nativeLibraryPath);
+        MesosNativeLibrary.load(nativeLibraryPath);
       } catch (UnsatisfiedLinkError error) {
-          LOGGER.warning("Failed to load native Mesos library from '" + nativeLibraryPath +
-                         "': " + error.getMessage());
-          MesosNativeLibrary.load();
+        LOGGER.warning("Failed to load native Mesos library from '" + nativeLibraryPath + "': " + error.getMessage());
+        MesosNativeLibrary.load();
       }
       nativeLibraryLoaded = true;
     }
@@ -385,20 +360,20 @@ public class MesosCloud extends Cloud {
   /**
    * Returns the credentials object associated with the stored credentialsId.
    *
-   * @return The credentials object associated with the stored credentialsId. May be null if credentialsId is null or
-   * if there is no credentials associated with the given id.
+   * @return The credentials object associated with the stored credentialsId. May
+   *         be null if credentialsId is null or if there is no credentials
+   *         associated with the given id.
    */
   public StandardUsernamePasswordCredentials getCredentials() {
     if (credentialsId == null) {
       return null;
     } else {
       List<DomainRequirement> domainRequirements = (master == null) ? Collections.<DomainRequirement>emptyList()
-              : URIRequirementBuilder.fromUri(master.trim()).build();
+          : URIRequirementBuilder.fromUri(master.trim()).build();
       Jenkins jenkins = getJenkins();
       return CredentialsMatchers.firstOrNull(CredentialsProvider
-                      .lookupCredentials(StandardUsernamePasswordCredentials.class, jenkins, ACL.SYSTEM, domainRequirements),
-              CredentialsMatchers.withId(credentialsId)
-      );
+          .lookupCredentials(StandardUsernamePasswordCredentials.class, jenkins, ACL.SYSTEM, domainRequirements),
+          CredentialsMatchers.withId(credentialsId));
     }
   }
 
@@ -435,25 +410,25 @@ public class MesosCloud extends Cloud {
         }
         final int numExecutors = Math.max(minExecutors, Math.min(excessWorkload, maxExecutors));
         excessWorkload -= numExecutors;
-        LOGGER.info("Provisioning Jenkins Slave on Mesos with " + numExecutors +
-                    " executors. Remaining excess workload: " + excessWorkload + " executors)");
+        LOGGER.info("Provisioning Jenkins Slave on Mesos with " + numExecutors
+            + " executors. Remaining excess workload: " + excessWorkload + " executors)");
 
-        // Create a context that can be passed down through the provisioning process and finalized when
+        // Create a context that can be passed down through the provisioning process and
+        // finalized when
         // the request is completely fulfilled.
         Timer.Context context = Metrics.metricRegistry().timer(getMetricName(label, "provision", "submit")).time();
-        list.add(new PlannedNode(this.getDisplayName(), Computer.threadPoolForRemoting
-            .submit(new Callable<Node>() {
-              public Node call() throws Exception {
-                MesosSlave s = doProvision(numExecutors, slaveInfo, context);
+        list.add(new PlannedNode(this.getDisplayName(), Computer.threadPoolForRemoting.submit(new Callable<Node>() {
+          public Node call() throws Exception {
+            MesosSlave s = doProvision(numExecutors, slaveInfo, context);
 
-                // We do not need to explicitly add the Node here because that is handled by
-                // hudson.slaves.NodeProvisioner::update() that checks the result from the
-                // Future and adds the node. Though there is duplicate node addition check
-                // because of this early addition there is difference in job scheduling and
-                // best to avoid it.
-                return s;
-              }
-            }), numExecutors));
+            // We do not need to explicitly add the Node here because that is handled by
+            // hudson.slaves.NodeProvisioner::update() that checks the result from the
+            // Future and adds the node. Though there is duplicate node addition check
+            // because of this early addition there is difference in job scheduling and
+            // best to avoid it.
+            return s;
+          }
+        }), numExecutors));
       }
     } catch (Exception e) {
       LOGGER.log(Level.WARNING, "Failed to create instances on Mesos", e);
@@ -462,8 +437,10 @@ public class MesosCloud extends Cloud {
     return list;
   }
 
-  private MesosSlave doProvision(int numExecutors, MesosSlaveInfo slaveInfo, Timer.Context provisioningContext) throws Descriptor.FormException, IOException {
-    return new MesosSlave(this, MesosUtils.buildNodeName(slaveInfo.getLabelString()), numExecutors, slaveInfo, provisioningContext);
+  private MesosSlave doProvision(int numExecutors, MesosSlaveInfo slaveInfo, Timer.Context provisioningContext)
+      throws Descriptor.FormException, IOException {
+    return new MesosSlave(this, MesosUtils.buildNodeName(slaveInfo.getLabelString()), numExecutors, slaveInfo,
+        provisioningContext);
   }
 
   public List<MesosSlaveInfo> getSlaveInfos() {
@@ -524,14 +501,16 @@ public class MesosCloud extends Cloud {
   }
 
   public String getCloudID() {
-    if(this.cloudID == null || this.cloudID.isEmpty()) {
-      //Give each cloud a unique ID so it can be looked up after config changes
+    if (this.cloudID == null || this.cloudID.isEmpty()) {
+      // Give each cloud a unique ID so it can be looked up after config changes
       this.cloudID = UUID.randomUUID().toString();
     }
     return this.cloudID;
   }
 
-  public void setCloudID(String cloudID) { this.cloudID = cloudID; }
+  public void setCloudID(String cloudID) {
+    this.cloudID = cloudID;
+  }
 
   public String getRole() {
     return role;
@@ -620,12 +599,12 @@ public class MesosCloud extends Cloud {
   }
 
   public static MesosCloud get() {
-    return Hudson.getInstance().clouds.get(MesosCloud.class);
+    return Jenkins.getInstance().clouds.get(MesosCloud.class);
   }
 
   /**
-  * @return the checkpoint
-  */
+   * @return the checkpoint
+   */
   public boolean isCheckpoint() {
     return checkpoint;
   }
@@ -641,16 +620,16 @@ public class MesosCloud extends Cloud {
   }
 
   /**
-  * Retrieves the slaveattribute corresponding to label name.
-  *
-  * @param labelName The Jenkins label name.
-  * @return slaveattribute as a JSONObject.
-  */
+   * Retrieves the slaveattribute corresponding to label name.
+   *
+   * @param labelName The Jenkins label name.
+   * @return slaveattribute as a JSONObject.
+   */
 
   public JSONObject getSlaveAttributeForLabel(String labelName) {
     for (MesosSlaveInfo slaveInfo : slaveInfos) {
       if (StringUtils.equals(labelName, slaveInfo.getLabelString())) {
-          return slaveInfo.getSlaveAttributes();
+        return slaveInfo.getSlaveAttributes();
       }
     }
     return null;
@@ -670,14 +649,13 @@ public class MesosCloud extends Cloud {
   private void migrateToCredentials() {
     if (principal != null) {
       List<DomainRequirement> domainRequirements = (master == null) ? Collections.<DomainRequirement>emptyList()
-        : URIRequirementBuilder.fromUri(master.trim()).build();
+          : URIRequirementBuilder.fromUri(master.trim()).build();
       Jenkins jenkins = getJenkins();
       // Look up existing credentials with the same username.
       List<StandardUsernamePasswordCredentials> credentials = CredentialsMatchers.filter(CredentialsProvider
-        .lookupCredentials(StandardUsernamePasswordCredentials.class, jenkins, ACL.SYSTEM, domainRequirements),
-        CredentialsMatchers.withUsername(principal)
-      );
-      for (StandardUsernamePasswordCredentials cred: credentials) {
+          .lookupCredentials(StandardUsernamePasswordCredentials.class, jenkins, ACL.SYSTEM, domainRequirements),
+          CredentialsMatchers.withUsername(principal));
+      for (StandardUsernamePasswordCredentials cred : credentials) {
         if (StringUtils.equals(secret, Secret.toString(cred.getPassword()))) {
           // If some credentials have the same username/password, use those.
           this.credentialsId = cred.getId();
@@ -688,7 +666,7 @@ public class MesosCloud extends Cloud {
         // If we couldn't find any existing credentials,
         // create new credentials with the principal and secret and use it.
         StandardUsernamePasswordCredentials newCredentials = new UsernamePasswordCredentialsImpl(
-          CredentialsScope.SYSTEM, null, null, principal, secret);
+            CredentialsScope.SYSTEM, null, null, principal, secret);
         SystemCredentialsProvider.getInstance().getCredentials().add(newCredentials);
         this.credentialsId = newCredentials.getId();
       }
@@ -698,12 +676,12 @@ public class MesosCloud extends Cloud {
   }
 
   public String getJenkinsURL() {
-	return jenkinsURL;
-}
+    return jenkinsURL;
+  }
 
-public void setJenkinsURL(String jenkinsURL) {
-	this.jenkinsURL = jenkinsURL;
-}
+  public void setJenkinsURL(String jenkinsURL) {
+    this.jenkinsURL = jenkinsURL;
+  }
 
   public String getDeclineOfferDuration() {
     if (declineOfferDuration == null) {
@@ -727,19 +705,19 @@ public void setJenkinsURL(String jenkinsURL) {
         if (duration >= 1000) {
           this.declineOfferDuration = declineOfferDuration;
         } else {
-          LOGGER.warning("Minimum declineOfferDuration (1000) > " + declineOfferDuration
-              + ". Using default " + DEFAULT_DECLINE_OFFER_DURATION + " ms.");
+          LOGGER.warning("Minimum declineOfferDuration (1000) > " + declineOfferDuration + ". Using default "
+              + DEFAULT_DECLINE_OFFER_DURATION + " ms.");
           this.declineOfferDuration = DEFAULT_DECLINE_OFFER_DURATION;
         }
       }
     } catch (NumberFormatException e) {
-      LOGGER.warning("Unable to parse declineOfferDuration: " + declineOfferDuration
-          + ". Using default " + DEFAULT_DECLINE_OFFER_DURATION + " ms.");
+      LOGGER.warning("Unable to parse declineOfferDuration: " + declineOfferDuration + ". Using default "
+          + DEFAULT_DECLINE_OFFER_DURATION + " ms.");
       this.declineOfferDuration = DEFAULT_DECLINE_OFFER_DURATION;
     }
   }
 
-@Extension
+  @Extension
   public static class DescriptorImpl extends Descriptor<Cloud> {
 
     @Override
@@ -753,21 +731,18 @@ public void setJenkinsURL(String jenkinsURL) {
     public ListBoxModel doFillCredentialsIdItems(@AncestorInPath Item item, @QueryParameter String master) {
       Jenkins.getInstance().checkPermission(Jenkins.ADMINISTER);
       List<DomainRequirement> domainRequirements = (master == null) ? Collections.<DomainRequirement>emptyList()
-        : URIRequirementBuilder.fromUri(master.trim()).build();
-      return new StandardListBoxModel().withEmptySelection().withMatching(
-        CredentialsMatchers.instanceOf(UsernamePasswordCredentials.class),
-        CredentialsProvider.lookupCredentials(StandardUsernamePasswordCredentials.class, item, null, domainRequirements)
-      );
+          : URIRequirementBuilder.fromUri(master.trim()).build();
+      return new StandardListBoxModel().withEmptySelection()
+          .withMatching(CredentialsMatchers.instanceOf(UsernamePasswordCredentials.class), CredentialsProvider
+              .lookupCredentials(StandardUsernamePasswordCredentials.class, item, null, domainRequirements));
     }
 
     /**
      * Test connection from configuration page.
      */
     @RequirePOST
-    public FormValidation doTestConnection(
-        @QueryParameter("master") String master,
-        @QueryParameter("nativeLibraryPath") String nativeLibraryPath)
-        throws IOException, ServletException {
+    public FormValidation doTestConnection(@QueryParameter("master") String master,
+        @QueryParameter("nativeLibraryPath") String nativeLibraryPath) throws IOException, ServletException {
       Jenkins.getInstance().checkPermission(Jenkins.ADMINISTER);
       master = master.trim();
 
@@ -776,8 +751,8 @@ public void setJenkinsURL(String jenkinsURL) {
       }
 
       if (master.startsWith("zk://")) {
-        return FormValidation.warning("Zookeeper paths can be used, but the connection cannot be " +
-            "tested prior to saving this page.");
+        return FormValidation.warning(
+            "Zookeeper paths can be used, but the connection cannot be " + "tested prior to saving this page.");
       }
 
       if (master.startsWith("http://")) {
@@ -790,8 +765,7 @@ public void setJenkinsURL(String jenkinsURL) {
 
       try {
         // URL requires the protocol to be explicitly specified.
-        HttpURLConnection urlConn =
-          (HttpURLConnection) new URL("http://" + master).openConnection();
+        HttpURLConnection urlConn = (HttpURLConnection) new URL("http://" + master).openConnection();
         urlConn.connect();
         int code = urlConn.getResponseCode();
         urlConn.disconnect();
@@ -820,13 +794,11 @@ public void setJenkinsURL(String jenkinsURL) {
       boolean isValid = true;
       String errorMessage = "Invalid disk space entered. It should be a positive decimal.";
 
-      if (StringUtils.isBlank(value)){
+      if (StringUtils.isBlank(value)) {
         isValid = false;
-      }
-      else {
+      } else {
         try {
-          if (Double.parseDouble(value) < 0)
-          {
+          if (Double.parseDouble(value) < 0) {
             isValid = false;
           }
         } catch (NumberFormatException e) {
@@ -835,7 +807,6 @@ public void setJenkinsURL(String jenkinsURL) {
       }
       return isValid ? FormValidation.ok() : FormValidation.error(errorMessage);
     }
-
 
     private FormValidation doCheckCpus(@QueryParameter String value) {
       Jenkins.getInstance().checkPermission(Jenkins.ADMINISTER);
