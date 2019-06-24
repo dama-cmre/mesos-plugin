@@ -475,6 +475,7 @@ public class JenkinsSchedulerTest {
                 null,               // jvmArgs,
                 null,               // jnlpArgs,
                 null,               // defaultSlave,
+                null,               // windowsAgent,
                 containerInfo,      // containerInfo,
                 null,              // additionalURIs
                 null              // nodeProperties
