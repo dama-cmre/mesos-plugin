@@ -975,7 +975,13 @@ public class JenkinsScheduler implements Scheduler {
             List args = new ArrayList();
             args.add(jenkinsCommand2Run);
             commandBuilder.addAllArguments( args );
-
+        } else if(request.request.slaveInfo.isWindowsAgent()) {
+            LOGGER.warning("Agent is a windows node so using cmd");
+            commandBuilder.setShell(false);
+            commandBuilder.setValue("cmd /c");
+            List args = new ArrayList();
+            args.add(jenkinsCommand2Run);
+            commandBuilder.addAllArguments( args );
         } else {
             LOGGER.fine("About to use default shell ....");
             commandBuilder.setValue(jenkinsCommand2Run);
