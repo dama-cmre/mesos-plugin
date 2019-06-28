@@ -64,7 +64,7 @@ public class JenkinsScheduler implements Scheduler {
     private static final String SLAVE_COMMAND_FORMAT =
         "java -DHUDSON_HOME=jenkins -server -Xmx%dm %s -jar ${MESOS_SANDBOX-.}/slave.jar %s %s -jnlpUrl %s";
     private static final String WIN_AGENT_COMMAND_FORMAT = 
-        "%%JAVA_HOME%%/bin/java -DHUDSON_HOME=jenkins -server -Xmx%dm %s -jar %%{MESOS_SANDBOX-.}%%/slave.jar %s %s -jnlpUrl %s";
+        "%%JAVA_HOME%%/bin/java -DHUDSON_HOME=jenkins -server -Xmx%dm %s -jar %%MESOS_SANDBOX%%/slave.jar %s %s -jnlpUrl %s";
     private static final String JNLP_SECRET_FORMAT = "-secret %s";
     public static final String PORT_RESOURCE_NAME = "ports";
     public static final String MESOS_DEFAULT_ROLE = "*";
