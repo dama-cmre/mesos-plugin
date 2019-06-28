@@ -944,7 +944,7 @@ public class JenkinsScheduler implements Scheduler {
 
     String generateJenkinsCommand2Run(int jvmMem,String jvmArgString,String jnlpArgString,String slaveName, boolean isWindows) {
 
-        return String.format(isWindows ? SLAVE_COMMAND_FORMAT: WIN_AGENT_COMMAND_FORMAT,
+        return String.format(isWindows ? WIN_AGENT_COMMAND_FORMAT : SLAVE_COMMAND_FORMAT,
                 jvmMem,
                 jvmArgString,
                 jnlpArgString,
