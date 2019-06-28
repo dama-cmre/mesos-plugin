@@ -63,6 +63,7 @@ public class JenkinsScheduler implements Scheduler {
 
     private static final String SLAVE_COMMAND_FORMAT =
             "java -DHUDSON_HOME=jenkins -server -Xmx%dm %s -jar ${MESOS_SANDBOX-.}/slave.jar %s %s -jnlpUrl %s";
+    private static final String WINDOWS_PREFIX = "%JAVA_HOME%/bin/";
     private static final String JNLP_SECRET_FORMAT = "-secret %s";
     public static final String PORT_RESOURCE_NAME = "ports";
     public static final String MESOS_DEFAULT_ROLE = "*";
@@ -959,6 +960,11 @@ public class JenkinsScheduler implements Scheduler {
                 request.request.slaveInfo.getJnlpArgs(),
                 request.request.slave.name);
 
+        // On a windows agent the host machines Path is not used so this is a hack to try and get the jenkins command to actually run
+        if (request.request.slaveInfo.isWindowsAgent()) {
+            jenkinsCommand2Run = WINDOWS_PREFIX + jenkinsCommand2Run;
+        }
+
         if (request.request.slaveInfo.getContainerInfo() != null &&
                 request.request.slaveInfo.getContainerInfo().getUseCustomDockerCommandShell()) {
             // Ref http://mesos.apache.org/documentation/latest/upgrades
@@ -972,14 +978,7 @@ public class JenkinsScheduler implements Scheduler {
             LOGGER.fine( String.format( "About to use custom shell: %s " , customShell));
             commandBuilder.setShell(false);
             commandBuilder.setValue(customShell);
-            List args = new ArrayList();
-            args.add(jenkinsCommand2Run);
-            commandBuilder.addAllArguments( args );
-        } else if(request.request.slaveInfo.isWindowsAgent()) {
-            LOGGER.warning("Agent is a windows node so using cmd");
-            commandBuilder.setShell(false);
-            commandBuilder.setValue("cmd /c");
-            List args = new ArrayList();
+            List<String> args = new ArrayList<String>();
             args.add(jenkinsCommand2Run);
             commandBuilder.addAllArguments( args );
         } else {
