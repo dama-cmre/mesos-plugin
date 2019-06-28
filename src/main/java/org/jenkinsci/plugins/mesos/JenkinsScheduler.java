@@ -62,8 +62,9 @@ public class JenkinsScheduler implements Scheduler {
     private static final double JVM_MEM_OVERHEAD_FACTOR = 0.1;
 
     private static final String SLAVE_COMMAND_FORMAT =
-            "java -DHUDSON_HOME=jenkins -server -Xmx%dm %s -jar ${MESOS_SANDBOX-.}/slave.jar %s %s -jnlpUrl %s";
-    private static final String WINDOWS_PREFIX = "%JAVA_HOME%/bin/";
+        "java -DHUDSON_HOME=jenkins -server -Xmx%dm %s -jar ${MESOS_SANDBOX-.}/slave.jar %s %s -jnlpUrl %s";
+    private static final String WIN_AGENT_COMMAND_FORMAT = 
+        "%%JAVA_HOME%%/bin/java -DHUDSON_HOME=jenkins -server -Xmx%dm %s -jar %%{MESOS_SANDBOX-.}%%/slave.jar %s %s -jnlpUrl %s";
     private static final String JNLP_SECRET_FORMAT = "-secret %s";
     public static final String PORT_RESOURCE_NAME = "ports";
     public static final String MESOS_DEFAULT_ROLE = "*";
@@ -941,9 +942,9 @@ public class JenkinsScheduler implements Scheduler {
         return commandBuilder;
     }
 
-    String generateJenkinsCommand2Run(int jvmMem,String jvmArgString,String jnlpArgString,String slaveName) {
+    String generateJenkinsCommand2Run(int jvmMem,String jvmArgString,String jnlpArgString,String slaveName, boolean isWindows) {
 
-        return String.format(SLAVE_COMMAND_FORMAT,
+        return String.format(isWindows ? SLAVE_COMMAND_FORMAT: WIN_AGENT_COMMAND_FORMAT,
                 jvmMem,
                 jvmArgString,
                 jnlpArgString,
@@ -958,12 +959,8 @@ public class JenkinsScheduler implements Scheduler {
                 request.request.slaveInfo.getSlaveMem(),
                 request.request.slaveInfo.getJvmArgs(),
                 request.request.slaveInfo.getJnlpArgs(),
-                request.request.slave.name);
-
-        // On a windows agent the host machines Path is not used so this is a hack to try and get the jenkins command to actually run
-        if (request.request.slaveInfo.isWindowsAgent()) {
-            jenkinsCommand2Run = WINDOWS_PREFIX + jenkinsCommand2Run;
-        }
+                request.request.slave.name,
+                request.request.slaveInfo.isWindowsAgent());
 
         if (request.request.slaveInfo.getContainerInfo() != null &&
                 request.request.slaveInfo.getContainerInfo().getUseCustomDockerCommandShell()) {
