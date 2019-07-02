@@ -917,7 +917,6 @@ public class JenkinsScheduler implements Scheduler {
         return commandBuilder;
     }
 
-<<<<<<< HEAD
     String generateJenkinsCommand2Run(int jvmMem,String jvmArgString,String jnlpArgString,String slaveName, boolean isWindows) {
 
         return String.format(isWindows ? WIN_AGENT_COMMAND_FORMAT : SLAVE_COMMAND_FORMAT,
@@ -925,29 +924,18 @@ public class JenkinsScheduler implements Scheduler {
                 jvmArgString,
                 jnlpArgString,
                 getJnlpSecret(slaveName),
-=======
-    String generateJenkinsCommand2Run(int jvmMem, String jvmArgString, String jnlpArgString, String slaveName) {
-
-        return String.format(SLAVE_COMMAND_FORMAT, jvmMem, jvmArgString, jnlpArgString, getJnlpSecret(slaveName),
->>>>>>> master
                 getJnlpUrl(slaveName));
     }
 
     private CommandInfo.Builder getBaseCommandBuilder(Request request) {
 
         CommandInfo.Builder commandBuilder = CommandInfo.newBuilder();
-<<<<<<< HEAD
         String jenkinsCommand2Run = generateJenkinsCommand2Run(
                 request.request.slaveInfo.getSlaveMem(),
                 request.request.slaveInfo.getJvmArgs(),
                 request.request.slaveInfo.getJnlpArgs(),
                 request.request.slave.name,
                 request.request.slaveInfo.isWindowsAgent());
-=======
-        String jenkinsCommand2Run = generateJenkinsCommand2Run(request.request.slaveInfo.getSlaveMem(),
-                request.request.slaveInfo.getJvmArgs(), request.request.slaveInfo.getJnlpArgs(),
-                request.request.slave.name);
->>>>>>> master
 
         if (request.request.slaveInfo.getContainerInfo() != null
                 && request.request.slaveInfo.getContainerInfo().getUseCustomDockerCommandShell()) {
@@ -964,12 +952,8 @@ public class JenkinsScheduler implements Scheduler {
             commandBuilder.setValue(customShell);
             List<String> args = new ArrayList<String>();
             args.add(jenkinsCommand2Run);
-<<<<<<< HEAD
-            commandBuilder.addAllArguments( args );
-=======
             commandBuilder.addAllArguments(args);
 
->>>>>>> master
         } else {
             LOGGER.fine("About to use default shell ....");
             commandBuilder.setValue(jenkinsCommand2Run);
