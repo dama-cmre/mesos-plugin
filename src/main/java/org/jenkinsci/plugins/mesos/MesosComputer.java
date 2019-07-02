@@ -57,7 +57,7 @@ public class MesosComputer extends SlaveComputer {
 
   @Override
   @WebMethod(name="slave-agent.jnlp")
-  public HttpResponse doSlaveAgentJnlp(StaplerRequest req, StaplerResponse res) throws IOException, ServletException {
+  public HttpResponse doSlaveAgentJnlp(StaplerRequest req, StaplerResponse res) {
 	  return new EncryptedSlaveAgentJnlpFile(this, "mesos-slave-agent.jnlp.jelly", getName(), CONNECT);
   }
 

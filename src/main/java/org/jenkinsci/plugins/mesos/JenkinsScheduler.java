@@ -50,7 +50,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 public class JenkinsScheduler implements Scheduler {
-    private static final String SLAVE_JAR_URI_SUFFIX = "jnlpJars/slave.jar";
+    private static final String SLAVE_JAR_URI_SUFFIX = "jnlpJars/agent.jar";
 
     /**
      * When created, we expect this scheduler to live for at least 1 minute before killing it.
@@ -62,9 +62,9 @@ public class JenkinsScheduler implements Scheduler {
     private static final double JVM_MEM_OVERHEAD_FACTOR = 0.1;
 
     private static final String SLAVE_COMMAND_FORMAT =
-        "java -DHUDSON_HOME=jenkins -server -Xmx%dm %s -jar ${MESOS_SANDBOX-.}/slave.jar %s %s -jnlpUrl %s";
+        "java -DHUDSON_HOME=jenkins -server -Xmx%dm %s -jar ${MESOS_SANDBOX-.}/agent.jar %s %s -jnlpUrl %s";
     private static final String WIN_AGENT_COMMAND_FORMAT = 
-        "%%JAVA_HOME%%/bin/java -DHUDSON_HOME=jenkins -server -Xmx%dm %s -jar %%MESOS_SANDBOX%%/slave.jar %s %s -jnlpUrl %s";
+        "%%JAVA_HOME%%/bin/java -DHUDSON_HOME=jenkins -server -Xmx%dm %s -jar %%MESOS_SANDBOX%%/agent.jar %s %s -jnlpUrl %s";
     private static final String JNLP_SECRET_FORMAT = "-secret %s";
     public static final String PORT_RESOURCE_NAME = "ports";
     public static final String MESOS_DEFAULT_ROLE = "*";
