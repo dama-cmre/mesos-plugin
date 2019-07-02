@@ -15,7 +15,6 @@
 
 package org.jenkinsci.plugins.mesos;
 
-
 import com.cloudbees.plugins.credentials.common.StandardUsernamePasswordCredentials;
 import com.codahale.metrics.Timer;
 import com.google.common.annotations.VisibleForTesting;
@@ -53,12 +52,14 @@ public class JenkinsScheduler implements Scheduler {
     private static final String SLAVE_JAR_URI_SUFFIX = "jnlpJars/agent.jar";
 
     /**
-     * When created, we expect this scheduler to live for at least 1 minute before killing it.
-     * This prevents race conditions between threads provisioning new nodes and threads terminating them.
+     * When created, we expect this scheduler to live for at least 1 minute before
+     * killing it. This prevents race conditions between threads provisioning new
+     * nodes and threads terminating them.
      */
     private static final Long MINIMUM_TIME_TO_LIVE = TimeUnit.MINUTES.toMillis(1);
 
-    // We allocate 10% more memory to the Mesos task to account for the JVM overhead.
+    // We allocate 10% more memory to the Mesos task to account for the JVM
+    // overhead.
     private static final double JVM_MEM_OVERHEAD_FACTOR = 0.1;
 
     private static final String SLAVE_COMMAND_FORMAT =
@@ -86,7 +87,7 @@ public class JenkinsScheduler implements Scheduler {
 
     public static final Lock SUPERVISOR_LOCK = new ReentrantLock();
 
-    private static int lruCacheSize = Integer.getInteger(JenkinsScheduler.class.getName()+".lruCacheSize", 10);
+    private static int lruCacheSize = Integer.getInteger(JenkinsScheduler.class.getName() + ".lruCacheSize", 10);
 
     private static LRUMap<String, Object> recentlyAcceptedOffers = new LRUMap<String, Object>(lruCacheSize);
 
@@ -98,7 +99,8 @@ public class JenkinsScheduler implements Scheduler {
 
     public JenkinsScheduler(String jenkinsMaster, MesosCloud mesosCloud, boolean multiThreaded) {
         startedTime = System.currentTimeMillis();
-        LOGGER.info("JenkinsScheduler instantiated with jenkins " + jenkinsMaster + " and mesos " + mesosCloud.getMaster() + " multithreaded " + multiThreaded);
+        LOGGER.info("JenkinsScheduler instantiated with jenkins " + jenkinsMaster + " and mesos "
+                + mesosCloud.getMaster() + " multithreaded " + multiThreaded);
 
         this.jenkinsMaster = jenkinsMaster;
         this.mesosCloud = mesosCloud;
@@ -111,37 +113,29 @@ public class JenkinsScheduler implements Scheduler {
     }
 
     public synchronized void init() {
-        // This is to ensure that isRunning() returns true even when the driver is not yet inside run().
-        // This is important because MesosCloud.provision() starts a new framework whenever isRunning() is false.
+        // This is to ensure that isRunning() returns true even when the driver is not
+        // yet inside run().
+        // This is important because MesosCloud.provision() starts a new framework
+        // whenever isRunning() is false.
         running = true;
         String targetUser = mesosCloud.getSlavesUser();
         String webUrl = getJenkins().getRootUrl();
-        if (webUrl == null) webUrl = System.getenv("JENKINS_URL");
+        if (webUrl == null)
+            webUrl = System.getenv("JENKINS_URL");
         StandardUsernamePasswordCredentials credentials = mesosCloud.getCredentials();
         String principal = credentials == null ? "jenkins" : credentials.getUsername();
         String secret = credentials == null ? "" : Secret.toString(credentials.getPassword());
         // Have Mesos fill in the current user.
-        FrameworkInfo framework = FrameworkInfo.newBuilder()
-                .setUser(targetUser == null ? "" : targetUser)
-                .setName(mesosCloud.getFrameworkName())
-                .setRole(mesosCloud.getRole())
-                .setPrincipal(principal)
-                .setCheckpoint(mesosCloud.isCheckpoint())
-                .setWebuiUrl(webUrl != null ? webUrl : "")
-                .build();
+        FrameworkInfo framework = FrameworkInfo.newBuilder().setUser(targetUser == null ? "" : targetUser)
+                .setName(mesosCloud.getFrameworkName()).setRole(mesosCloud.getRole()).setPrincipal(principal)
+                .setCheckpoint(mesosCloud.isCheckpoint()).setWebuiUrl(webUrl != null ? webUrl : "").build();
 
-        LOGGER.info("Initializing the Mesos driver with options"
-                + "\n" + "Framework Name: " + framework.getName()
-                + "\n" + "Principal: " + principal
-                + "\n" + "Checkpointing: " + framework.getCheckpoint()
-        );
+        LOGGER.info("Initializing the Mesos driver with options" + "\n" + "Framework Name: " + framework.getName()
+                + "\n" + "Principal: " + principal + "\n" + "Checkpointing: " + framework.getCheckpoint());
 
         if (StringUtils.isNotBlank(secret)) {
 
-            Credential credential = Credential.newBuilder()
-                    .setPrincipal(principal)
-                    .setSecret(secret)
-                    .build();
+            Credential credential = Credential.newBuilder().setPrincipal(principal).setSecret(secret).build();
 
             LOGGER.info("Authenticating with Mesos master with principal " + credential.getPrincipal());
             driver = new MesosSchedulerDriver(JenkinsScheduler.this, framework, mesosCloud.getMaster(), credential);
@@ -159,7 +153,7 @@ public class JenkinsScheduler implements Scheduler {
                     } else {
                         LOGGER.info("The Mesos driver was stopped.");
                     }
-                } catch(RuntimeException e) {
+                } catch (RuntimeException e) {
                     LOGGER.log(Level.SEVERE, "Caught a RuntimeException", e);
                 } finally {
                     SUPERVISOR_LOCK.lock();
@@ -217,30 +211,37 @@ public class JenkinsScheduler implements Scheduler {
 
     /**
      * @param slaveName the slave name in jenkins
-     * @return the jnlp url for the slave: http://[master]/computer/[slaveName]/slave-agent.jnlp
+     * @return the jnlp url for the slave:
+     *         http://[master]/computer/[slaveName]/slave-agent.jnlp
      */
     private String getJnlpUrl(String slaveName) {
         return joinPaths(joinPaths(joinPaths(jenkinsMaster, "computer"), slaveName), "slave-agent.jnlp");
     }
 
     /**
-     * Slave needs to go through authentication while connecting through jnlp if security is enabled in jenkins.
-     * This method gets secret (for jnlp authentication) from jenkins, constructs command line argument and returns it.
+     * Slave needs to go through authentication while connecting through jnlp if
+     * security is enabled in jenkins. This method gets secret (for jnlp
+     * authentication) from jenkins, constructs command line argument and returns
+     * it.
      *
      * @param slaveName the slave name in jenkins
-     * @return jenkins slave secret corresponding to slave name in the format '-secret <secret>'
+     * @return jenkins slave secret corresponding to slave name in the format
+     *         '-secret <secret>'
      */
     private String getJnlpSecret(String slaveName) {
         String jnlpSecret = "";
-        if(getJenkins().isUseSecurity()) {
-            jnlpSecret = String.format(JNLP_SECRET_FORMAT, jenkins.slaves.JnlpSlaveAgentProtocol.SLAVE_SECRET.mac(slaveName));
+        if (getJenkins().isUseSecurity()) {
+            jnlpSecret = String.format(JNLP_SECRET_FORMAT,
+                    jenkins.slaves.JnlpSlaveAgentProtocol.SLAVE_SECRET.mac(slaveName));
         }
         return jnlpSecret;
     }
 
     private static String joinPaths(String prefix, String suffix) {
-        if (prefix.endsWith("/"))   prefix = prefix.substring(0, prefix.length()-1);
-        if (suffix.startsWith("/")) suffix = suffix.substring(1, suffix.length());
+        if (prefix.endsWith("/"))
+            prefix = prefix.substring(0, prefix.length() - 1);
+        if (suffix.startsWith("/"))
+            suffix = suffix.substring(1, suffix.length());
 
         return prefix + '/' + suffix;
     }
@@ -257,16 +258,20 @@ public class JenkinsScheduler implements Scheduler {
             // This is handling the situation that a slave was provisioned but it never
             // got scheduled because of resource scarcity and jenkins later tries to remove
             // the offline slave but since it was not scheduled we have to remove it from
-            // the request queue. The method has been also synchronized because there is a race
-            // between this removal request from jenkins and a resource getting freed up in mesos
-            // resulting in scheduling the slave and resulting in orphaned task/slave not monitored
+            // the request queue. The method has been also synchronized because there is a
+            // race
+            // between this removal request from jenkins and a resource getting freed up in
+            // mesos
+            // resulting in scheduling the slave and resulting in orphaned task/slave not
+            // monitored
             // by Jenkins.
 
-            for(Request request : requests) {
-                if(request.request.slave.name.equals(name)) {
+            for (Request request : requests) {
+                if (request.request.slave.name.equals(name)) {
                     LOGGER.info("Removing enqueued mesos task " + name);
                     requests.remove(request);
-                    // Also signal the Thread of the MesosComputerLauncher.launch() to exit from latch.await()
+                    // Also signal the Thread of the MesosComputerLauncher.launch() to exit from
+                    // latch.await()
                     // Otherwise the Thread will stay in WAIT forever -> Leak!
                     request.result.failed(request.request.slave);
                     return;
@@ -276,7 +281,8 @@ public class JenkinsScheduler implements Scheduler {
             LOGGER.warning("Asked to kill unknown mesos task " + taskId);
         }
 
-        // Since this task is now running, we should not start this task up again at a later point in time
+        // Since this task is now running, we should not start this task up again at a
+        // later point in time
         finishedTasks.add(taskId);
 
         if (mesosCloud.isOnDemandRegistration()) {
@@ -319,7 +325,8 @@ public class JenkinsScheduler implements Scheduler {
         int processedRequests = 0;
         for (Offer offer : offers) {
             Metrics.metricRegistry().meter("mesos.scheduler.offer.processed").mark();
-            final Timer.Context offerContext = Metrics.metricRegistry().timer("mesos.scheduler.offer.processing.time").time();
+            final Timer.Context offerContext = Metrics.metricRegistry().timer("mesos.scheduler.offer.processing.time")
+                    .time();
             try {
                 if (requests.isEmpty() && !buildsInQueue(Jenkins.getInstance().getQueue())) {
                     unmatchedLabels.clear();
@@ -369,16 +376,18 @@ public class JenkinsScheduler implements Scheduler {
         }
         if (processedRequests > 0) {
             if (!requests.isEmpty()) {
-                LOGGER.info("Created " + processedRequests + " tasks from " + offers.size() + " offers (" + requests.size() + " pending requests).");
+                LOGGER.info("Created " + processedRequests + " tasks from " + offers.size() + " offers ("
+                        + requests.size() + " pending requests).");
             } else {
                 LOGGER.info("Created " + processedRequests + " tasks from " + offers.size() + " offers.");
             }
         } else {
             if (!requests.isEmpty()) {
-                LOGGER.info("Did not match any of the " + offers.size() + " offers (" + requests.size() + " pending requests)");
+                LOGGER.info("Did not match any of the " + offers.size() + " offers (" + requests.size()
+                        + " pending requests)");
             }
         }
-        for (Request request: requests) {
+        for (Request request : requests) {
             unmatchedLabels.add(request.request.slaveInfo.getLabelString());
         }
     }
@@ -452,16 +461,18 @@ public class JenkinsScheduler implements Scheduler {
     }
 
     /**
-     * Determines whether an offer of a Mesos Agent has an unavailability set and is currently scheduled for maintenance.
-     * <br /><br />
-     * For information on how to use this feature with Mesos refer to
-     * <a href="http://mesos.apache.org/documentation/latest/maintenance/">Maintenance Primitives</a>)
+     * Determines whether an offer of a Mesos Agent has an unavailability set and is
+     * currently scheduled for maintenance. <br />
+     * <br />
+     * For information on how to use this feature with Mesos refer to <a href=
+     * "http://mesos.apache.org/documentation/latest/maintenance/">Maintenance
+     * Primitives</a>)
      *
      * @param offer The offer to check for availability
      * @return whether or not the offer is currently available
      */
     private boolean isOfferAvailable(Offer offer) {
-        if(offer.hasUnavailability()) {
+        if (offer.hasUnavailability()) {
             Protos.Unavailability unavailability = offer.getUnavailability();
 
             Date startTime = new Date(TimeUnit.NANOSECONDS.toMillis(unavailability.getStart().getNanoseconds()));
@@ -483,15 +494,15 @@ public class JenkinsScheduler implements Scheduler {
     }
 
     /**
-     * Makes sure that it gives priority to recent mesos slaves
-     * (LRU algorithm) if its present in offers list.
-     * This will help in reducing build time since all the required
-     * artifacts will be present already.
+     * Makes sure that it gives priority to recent mesos slaves (LRU algorithm) if
+     * its present in offers list. This will help in reducing build time since all
+     * the required artifacts will be present already.
+     * 
      * @param offers
      */
     private void reArrangeOffersBasedOnAffinity(List<Offer> offers) {
-        if(recentlyAcceptedOffers.size() > 0) {
-            //Iterates from least to most recently used.
+        if (recentlyAcceptedOffers.size() > 0) {
+            // Iterates from least to most recently used.
             OrderedMapIterator<String, Object> mapIterator = recentlyAcceptedOffers.mapIterator();
             while (mapIterator.hasNext()) {
                 String recentSlaveId = mapIterator.next();
@@ -502,7 +513,7 @@ public class JenkinsScheduler implements Scheduler {
 
     private void reArrangeOffersBasedOnAffinity(List<Offer> offers, String recentSlaveId) {
         int offerIndex = getOfferIndex(offers, recentSlaveId);
-        if(offerIndex > 0) {
+        if (offerIndex > 0) {
             LOGGER.fine("Rearranging offers based on affinity");
             Offer recentOffer = offers.remove(offerIndex);
             offers.add(0, recentOffer);
@@ -512,7 +523,7 @@ public class JenkinsScheduler implements Scheduler {
     private int getOfferIndex(List<Offer> offers, String recentSlaveId) {
         int offerIndex = -1;
         for (Offer offer : offers) {
-            if(offer.getSlaveId().getValue().equals(recentSlaveId)) {
+            if (offer.getSlaveId().getValue().equals(recentSlaveId)) {
                 offerIndex = offers.indexOf(offer);
                 return offerIndex;
             }
@@ -528,9 +539,8 @@ public class JenkinsScheduler implements Scheduler {
         for (Resource resource : offer.getResourcesList()) {
             String resourceRole = resource.getRole();
             String expectedRole = mesosCloud.getRole();
-            if (! (resourceRole.equals(expectedRole) || resourceRole.equals("*"))) {
-                LOGGER.warning("Resource role " + resourceRole +
-                        " doesn't match expected role " + expectedRole);
+            if (!(resourceRole.equals(expectedRole) || resourceRole.equals("*"))) {
+                LOGGER.warning("Resource role " + resourceRole + " doesn't match expected role " + expectedRole);
                 continue;
             }
             if (resource.getName().equals("cpus")) {
@@ -558,8 +568,10 @@ public class JenkinsScheduler implements Scheduler {
             }
         }
 
-        if (cpus < 0) LOGGER.fine("No cpus resource present");
-        if (mem < 0)  LOGGER.fine("No mem resource present");
+        if (cpus < 0)
+            LOGGER.fine("No cpus resource present");
+        if (mem < 0)
+            LOGGER.fine("No mem resource present");
 
         MesosSlaveInfo.ContainerInfo containerInfo = request.request.slaveInfo.getContainerInfo();
 
@@ -575,11 +587,10 @@ public class JenkinsScheduler implements Scheduler {
         double requestedCpus = request.request.cpus;
         double requestedMem = (1 + JVM_MEM_OVERHEAD_FACTOR) * request.request.mem;
         // Get matching slave attribute for this label.
-        JSONObject slaveAttributes = getMesosCloud().getSlaveAttributeForLabel(request.request.slaveInfo.getLabelString());
+        JSONObject slaveAttributes = getMesosCloud()
+                .getSlaveAttributeForLabel(request.request.slaveInfo.getLabelString());
 
-        if (requestedCpus <= cpus
-                && requestedMem <= mem
-                && !(hasPortMappings && !hasPortResources)
+        if (requestedCpus <= cpus && requestedMem <= mem && !(hasPortMappings && !hasPortResources)
                 && slaveAttributesMatch(offer, slaveAttributes)) {
             return true;
         } else {
@@ -587,25 +598,21 @@ public class JenkinsScheduler implements Scheduler {
                     ? StringUtils.join(containerInfo.getPortMappings().toArray(), "/")
                     : "";
 
-            LOGGER.fine(
-                    "Offer not sufficient for slave request:\n" +
-                            offer.getResourcesList().toString() +
-                            "\n" + offer.getAttributesList().toString() +
-                            "\nRequested for Jenkins slave:\n" +
-                            "  cpus:  " + requestedCpus + "\n" +
-                            "  mem:   " + requestedMem + "\n" +
-                            "  ports: " + requestedPorts + "\n" +
-                            "  attributes:  " + (slaveAttributes == null ? ""  : slaveAttributes.toString()));
+            LOGGER.fine("Offer not sufficient for slave request:\n" + offer.getResourcesList().toString() + "\n"
+                    + offer.getAttributesList().toString() + "\nRequested for Jenkins slave:\n" + "  cpus:  "
+                    + requestedCpus + "\n" + "  mem:   " + requestedMem + "\n" + "  ports: " + requestedPorts + "\n"
+                    + "  attributes:  " + (slaveAttributes == null ? "" : slaveAttributes.toString()));
             return false;
         }
     }
 
     private boolean buildsInQueue(hudson.model.Queue queue) {
-        hudson.model.Queue.Item[] items =  queue.getItems();
-        if(items != null) {
-            for(hudson.model.Queue.Item item: items) {
-                // Check and return if there is an item in jenkins queue for which this MesosCloud can provsion a slave
-                if(mesosCloud.canProvision(item.getAssignedLabel())) {
+        hudson.model.Queue.Item[] items = queue.getItems();
+        if (items != null) {
+            for (hudson.model.Queue.Item item : items) {
+                // Check and return if there is an item in jenkins queue for which this
+                // MesosCloud can provsion a slave
+                if (mesosCloud.canProvision(item.getAssignedLabel())) {
                     return true;
                 }
             }
@@ -614,17 +621,18 @@ public class JenkinsScheduler implements Scheduler {
     }
 
     /**
-     * Checks whether the cloud Mesos slave attributes match those from the Mesos offer.
+     * Checks whether the cloud Mesos slave attributes match those from the Mesos
+     * offer.
      *
      * @param offer Mesos offer data object.
      * @return true if all the offer attributes match and false if not.
      */
     private boolean slaveAttributesMatch(Offer offer, JSONObject slaveAttributes) {
 
-        //Accept any and all Mesos slave offers by default.
+        // Accept any and all Mesos slave offers by default.
         boolean slaveTypeMatch = true;
 
-        //Collect the list of attributes from the offer as key-value pairs
+        // Collect the list of attributes from the offer as key-value pairs
         Map<String, String> attributesMap = new HashMap<String, String>();
         for (Attribute attribute : offer.getAttributesList()) {
             attributesMap.put(attribute.getName(), attribute.getText().getValue());
@@ -632,14 +640,16 @@ public class JenkinsScheduler implements Scheduler {
 
         if (slaveAttributes != null && slaveAttributes.size() > 0) {
 
-            //Iterate over the cloud attributes to see if they exist in the offer attributes list.
+            // Iterate over the cloud attributes to see if they exist in the offer
+            // attributes list.
             Iterator iterator = slaveAttributes.keys();
             while (iterator.hasNext()) {
 
                 String key = (String) iterator.next();
 
-                //If there is a single absent attribute then we should reject this offer.
-                if (!(attributesMap.containsKey(key) && attributesMap.get(key).toString().equals(slaveAttributes.getString(key)))) {
+                // If there is a single absent attribute then we should reject this offer.
+                if (!(attributesMap.containsKey(key)
+                        && attributesMap.get(key).toString().equals(slaveAttributes.getString(key)))) {
                     slaveTypeMatch = false;
                     break;
                 }
@@ -684,9 +694,8 @@ public class JenkinsScheduler implements Scheduler {
         LOGGER.fine("portRangesList=" + portRangesList);
 
         /**
-         * We need to find maxCount ports to use.
-         * We are provided a list of port ranges to use
-         * We are assured by the offer check that we have enough ports to use
+         * We need to find maxCount ports to use. We are provided a list of port ranges
+         * to use We are assured by the offer check that we have enough ports to use
          */
         // Check this port range for ports that we can use
         if (portRangesList != null) {
@@ -694,7 +703,8 @@ public class JenkinsScheduler implements Scheduler {
                 // Check each port until we reach the end of the current range
                 long begin = currentPortRange.getBegin();
                 long end = currentPortRange.getEnd();
-                for (long candidatePort = begin; candidatePort <= end && portsToUse.size() < maxCount; candidatePort++) {
+                for (long candidatePort = begin; candidatePort <= end
+                        && portsToUse.size() < maxCount; candidatePort++) {
                     portsToUse.add(candidatePort);
                 }
             }
@@ -707,8 +717,8 @@ public class JenkinsScheduler implements Scheduler {
         final String slaveName = request.request.slave.name;
         TaskID taskId = TaskID.newBuilder().setValue(slaveName).build();
 
-        LOGGER.fine("Launching task " + taskId.getValue() + " with URI " +
-                joinPaths(jenkinsMaster, SLAVE_JAR_URI_SUFFIX));
+        LOGGER.fine(
+                "Launching task " + taskId.getValue() + " with URI " + joinPaths(jenkinsMaster, SLAVE_JAR_URI_SUFFIX));
 
         if (isExistingTask(taskId)) {
             // TODO: This almost certainly is causing additional latency in the system.
@@ -728,7 +738,8 @@ public class JenkinsScheduler implements Scheduler {
             MesosSlave mesosSlave = mesosComputer.getNode();
 
             if (taskId.getValue().equals(computer.getName()) && mesosSlave.isPendingDelete()) {
-                LOGGER.info("This mesos task " + taskId.getValue() + " is pending deletion. Not launching another task");
+                LOGGER.info(
+                        "This mesos task " + taskId.getValue() + " is pending deletion. Not launching another task");
                 declineShort(offer);
                 return;
             }
@@ -748,8 +759,7 @@ public class JenkinsScheduler implements Scheduler {
         Filters filters = Filters.newBuilder().setRefuseSeconds(1).build();
         driver.launchTasks(offer.getId(), tasks, filters);
 
-        results.put(taskId, new Result(request.result, new Mesos.JenkinsSlave(offer.getSlaveId()
-                .getValue())));
+        results.put(taskId, new Result(request.result, new Mesos.JenkinsSlave(offer.getSlaveId().getValue())));
         finishedTasks.add(taskId);
     }
 
@@ -766,19 +776,16 @@ public class JenkinsScheduler implements Scheduler {
 
         if (request.request.slaveInfo.getAdditionalURIs() != null) {
             for (MesosSlaveInfo.URI uri : request.request.slaveInfo.getAdditionalURIs()) {
-                commandBuilder.addUris(
-                        CommandInfo.URI.newBuilder().setValue(
-                                uri.getValue()).setExecutable(uri.isExecutable()).setExtract(uri.isExtract()));
+                commandBuilder.addUris(CommandInfo.URI.newBuilder().setValue(uri.getValue())
+                        .setExecutable(uri.isExecutable()).setExtract(uri.isExtract()));
             }
         }
     }
 
-    private TaskInfo.Builder getTaskInfoBuilder(Offer offer, Request request, TaskID taskId, CommandInfo.Builder commandBuilder) {
-        TaskInfo.Builder builder = TaskInfo.newBuilder()
-                .setName("task " + taskId.getValue())
-                .setTaskId(taskId)
-                .setSlaveId(offer.getSlaveId())
-                .setCommand(commandBuilder.build());
+    private TaskInfo.Builder getTaskInfoBuilder(Offer offer, Request request, TaskID taskId,
+            CommandInfo.Builder commandBuilder) {
+        TaskInfo.Builder builder = TaskInfo.newBuilder().setName("task " + taskId.getValue()).setTaskId(taskId)
+                .setSlaveId(offer.getSlaveId()).setCommand(commandBuilder.build());
 
         double cpusNeeded = request.request.cpus;
         double memNeeded = (1 + JVM_MEM_OVERHEAD_FACTOR) * request.request.mem;
@@ -787,42 +794,20 @@ public class JenkinsScheduler implements Scheduler {
         for (Resource r : offer.getResourcesList()) {
             if (r.getName().equals("cpus") && cpusNeeded > 0) {
                 double cpus = Math.min(r.getScalar().getValue(), cpusNeeded);
-                builder.addResources(
-                        Resource
-                                .newBuilder()
-                                .setName("cpus")
-                                .setType(Value.Type.SCALAR)
-                                .setRole(r.getRole())
-                                .setScalar(
-                                        Value.Scalar.newBuilder()
-                                                .setValue(cpus).build()).build());
+                builder.addResources(Resource.newBuilder().setName("cpus").setType(Value.Type.SCALAR)
+                        .setRole(r.getRole()).setScalar(Value.Scalar.newBuilder().setValue(cpus).build()).build());
                 cpusNeeded -= cpus;
             } else if (r.getName().equals("mem") && memNeeded > 0) {
                 double mem = Math.min(r.getScalar().getValue(), memNeeded);
-                builder.addResources(
-                        Resource
-                                .newBuilder()
-                                .setName("mem")
-                                .setType(Value.Type.SCALAR)
-                                .setRole(r.getRole())
-                                .setScalar(
-                                        Value.Scalar.newBuilder()
-                                                .setValue(mem).build()).build());
+                builder.addResources(Resource.newBuilder().setName("mem").setType(Value.Type.SCALAR)
+                        .setRole(r.getRole()).setScalar(Value.Scalar.newBuilder().setValue(mem).build()).build());
                 memNeeded -= mem;
             } else if (r.getName().equals("disk") && diskNeeded > 0) {
                 double disk = Math.min(r.getScalar().getValue(), diskNeeded);
-                builder.addResources(
-                        Resource
-                                .newBuilder()
-                                .setName("disk")
-                                .setType(Value.Type.SCALAR)
-                                .setRole(r.getRole())
-                                .setScalar(
-                                        Value.Scalar.newBuilder()
-                                                .setValue(disk).build()).build());
+                builder.addResources(Resource.newBuilder().setName("disk").setType(Value.Type.SCALAR)
+                        .setRole(r.getRole()).setScalar(Value.Scalar.newBuilder().setValue(disk).build()).build());
 
-            }
-            else if (cpusNeeded == 0 && memNeeded == 0 && diskNeeded == 0) {
+            } else if (cpusNeeded == 0 && memNeeded == 0 && diskNeeded == 0) {
                 break;
             }
         }
@@ -836,79 +821,69 @@ public class JenkinsScheduler implements Scheduler {
         ContainerInfo.Builder containerInfoBuilder = ContainerInfo.newBuilder() //
                 .setType(containerType); //
 
-        switch(containerType) {
-            case DOCKER:
-                LOGGER.info("Launching in Docker Mode:" + containerInfo.getDockerImage());
-                DockerInfo.Builder dockerInfoBuilder = DockerInfo.newBuilder() //
-                        .setImage(containerInfo.getDockerImage())
-                        .setPrivileged(containerInfo.getDockerPrivilegedMode())
-                        .setForcePullImage(containerInfo.getDockerForcePullImage());
+        switch (containerType) {
+        case DOCKER:
+            LOGGER.info("Launching in Docker Mode:" + containerInfo.getDockerImage());
+            DockerInfo.Builder dockerInfoBuilder = DockerInfo.newBuilder() //
+                    .setImage(containerInfo.getDockerImage()).setPrivileged(containerInfo.getDockerPrivilegedMode())
+                    .setForcePullImage(containerInfo.getDockerForcePullImage());
 
-                if (containerInfo.getParameters() != null) {
-                    for (MesosSlaveInfo.Parameter parameter : containerInfo.getParameters()) {
-                        LOGGER.info("Adding Docker parameter '" + parameter.getKey() + ":" + parameter.getValue() + "'");
-                        dockerInfoBuilder.addParameters(Parameter.newBuilder().setKey(parameter.getKey()).setValue(parameter.getValue()).build());
-                    }
+            if (containerInfo.getParameters() != null) {
+                for (MesosSlaveInfo.Parameter parameter : containerInfo.getParameters()) {
+                    LOGGER.info("Adding Docker parameter '" + parameter.getKey() + ":" + parameter.getValue() + "'");
+                    dockerInfoBuilder.addParameters(
+                            Parameter.newBuilder().setKey(parameter.getKey()).setValue(parameter.getValue()).build());
+                }
+            }
+
+            String networking = request.request.slaveInfo.getContainerInfo().getNetworking();
+            dockerInfoBuilder.setNetwork(Network.valueOf(networking));
+
+            // https://github.com/jenkinsci/mesos-plugin/issues/109
+            if (dockerInfoBuilder.getNetwork() != Network.HOST) {
+                containerInfoBuilder.setHostname(slaveName);
+            }
+
+            if (request.request.slaveInfo.getContainerInfo().hasPortMappings()) {
+                List<MesosSlaveInfo.PortMapping> portMappings = request.request.slaveInfo.getContainerInfo()
+                        .getPortMappings();
+                Set<Long> portsToUse = findPortsToUse(offer, portMappings.size());
+                String roleToUse = findRoleForPorts(offer);
+                Iterator<Long> iterator = portsToUse.iterator();
+                Value.Ranges.Builder portRangesBuilder = Value.Ranges.newBuilder();
+
+                for (MesosSlaveInfo.PortMapping portMapping : portMappings) {
+                    PortMapping.Builder portMappingBuilder = PortMapping.newBuilder() //
+                            .setContainerPort(portMapping.getContainerPort()) //
+                            .setProtocol(portMapping.getProtocol());
+
+                    Long portToUse = portMapping.getHostPort() == null ? iterator.next()
+                            : Long.valueOf(portMapping.getHostPort());
+
+                    portMappingBuilder.setHostPort(portToUse.intValue());
+
+                    portRangesBuilder.addRange(Value.Range.newBuilder().setBegin(portToUse).setEnd(portToUse));
+
+                    LOGGER.finest("Adding portMapping: " + portMapping);
+                    dockerInfoBuilder.addPortMappings(portMappingBuilder);
                 }
 
-                String networking = request.request.slaveInfo.getContainerInfo().getNetworking();
-                dockerInfoBuilder.setNetwork(Network.valueOf(networking));
+                taskBuilder.addResources(Resource.newBuilder().setName("ports").setType(Value.Type.RANGES)
+                        .setRole(roleToUse).setRanges(portRangesBuilder));
+            } else {
+                LOGGER.fine("No portMappings found");
+            }
 
-                //  https://github.com/jenkinsci/mesos-plugin/issues/109
-                if (dockerInfoBuilder.getNetwork() != Network.HOST) {
-                    containerInfoBuilder.setHostname(slaveName);
-                }
-
-                if (request.request.slaveInfo.getContainerInfo().hasPortMappings()) {
-                    List<MesosSlaveInfo.PortMapping> portMappings = request.request.slaveInfo.getContainerInfo().getPortMappings();
-                    Set<Long> portsToUse = findPortsToUse(offer, portMappings.size());
-                    String roleToUse = findRoleForPorts(offer);
-                    Iterator<Long> iterator = portsToUse.iterator();
-                    Value.Ranges.Builder portRangesBuilder = Value.Ranges.newBuilder();
-
-                    for (MesosSlaveInfo.PortMapping portMapping : portMappings) {
-                        PortMapping.Builder portMappingBuilder = PortMapping.newBuilder() //
-                                .setContainerPort(portMapping.getContainerPort()) //
-                                .setProtocol(portMapping.getProtocol());
-
-                        Long portToUse = portMapping.getHostPort() == null ? iterator.next() : Long.valueOf(portMapping.getHostPort());
-
-                        portMappingBuilder.setHostPort(portToUse.intValue());
-
-                        portRangesBuilder.addRange(
-                                Value.Range
-                                        .newBuilder()
-                                        .setBegin(portToUse)
-                                        .setEnd(portToUse)
-                        );
-
-                        LOGGER.finest("Adding portMapping: " + portMapping);
-                        dockerInfoBuilder.addPortMappings(portMappingBuilder);
-                    }
-
-                    taskBuilder.addResources(
-                            Resource
-                                    .newBuilder()
-                                    .setName("ports")
-                                    .setType(Value.Type.RANGES)
-                                    .setRole(roleToUse)
-                                    .setRanges(portRangesBuilder)
-                    );
-                } else {
-                    LOGGER.fine("No portMappings found");
-                }
-
-                containerInfoBuilder.setDocker(dockerInfoBuilder);
-                break;
-            default:
-                LOGGER.warning("Unknown container type:" + containerInfo.getType());
+            containerInfoBuilder.setDocker(dockerInfoBuilder);
+            break;
+        default:
+            LOGGER.warning("Unknown container type:" + containerInfo.getType());
         }
 
         if (containerInfo.getVolumes() != null) {
             for (MesosSlaveInfo.Volume volume : containerInfo.getVolumes()) {
                 LOGGER.info("Adding volume '" + volume.getContainerPath() + "'");
-                Volume.Builder volumeBuilder = Volume.newBuilder()
-                        .setContainerPath(volume.getContainerPath())
+                Volume.Builder volumeBuilder = Volume.newBuilder().setContainerPath(volume.getContainerPath())
                         .setMode(volume.isReadOnly() ? Mode.RO : Mode.RW);
                 if (!volume.getHostPath().isEmpty()) {
                     volumeBuilder.setHostPath(volume.getHostPath());
@@ -923,9 +898,9 @@ public class JenkinsScheduler implements Scheduler {
                 NetworkInfo.Builder networkInfoBuilder = NetworkInfo.newBuilder();
 
                 if (networkInfo.hasNetworkName()) {
-                    //Add the virtual network specified, trimming edges for whitespace
+                    // Add the virtual network specified, trimming edges for whitespace
                     networkInfoBuilder.setName(networkInfo.getNetworkName().trim());
-                    LOGGER.info("Launching container on network " + networkInfo.getNetworkName() );
+                    LOGGER.info("Launching container on network " + networkInfo.getNetworkName());
                 }
 
                 containerInfoBuilder.addNetworkInfos(networkInfoBuilder.build());
@@ -942,6 +917,7 @@ public class JenkinsScheduler implements Scheduler {
         return commandBuilder;
     }
 
+<<<<<<< HEAD
     String generateJenkinsCommand2Run(int jvmMem,String jvmArgString,String jnlpArgString,String slaveName, boolean isWindows) {
 
         return String.format(isWindows ? WIN_AGENT_COMMAND_FORMAT : SLAVE_COMMAND_FORMAT,
@@ -949,48 +925,65 @@ public class JenkinsScheduler implements Scheduler {
                 jvmArgString,
                 jnlpArgString,
                 getJnlpSecret(slaveName),
+=======
+    String generateJenkinsCommand2Run(int jvmMem, String jvmArgString, String jnlpArgString, String slaveName) {
+
+        return String.format(SLAVE_COMMAND_FORMAT, jvmMem, jvmArgString, jnlpArgString, getJnlpSecret(slaveName),
+>>>>>>> master
                 getJnlpUrl(slaveName));
     }
 
     private CommandInfo.Builder getBaseCommandBuilder(Request request) {
 
         CommandInfo.Builder commandBuilder = CommandInfo.newBuilder();
+<<<<<<< HEAD
         String jenkinsCommand2Run = generateJenkinsCommand2Run(
                 request.request.slaveInfo.getSlaveMem(),
                 request.request.slaveInfo.getJvmArgs(),
                 request.request.slaveInfo.getJnlpArgs(),
                 request.request.slave.name,
                 request.request.slaveInfo.isWindowsAgent());
+=======
+        String jenkinsCommand2Run = generateJenkinsCommand2Run(request.request.slaveInfo.getSlaveMem(),
+                request.request.slaveInfo.getJvmArgs(), request.request.slaveInfo.getJnlpArgs(),
+                request.request.slave.name);
+>>>>>>> master
 
-        if (request.request.slaveInfo.getContainerInfo() != null &&
-                request.request.slaveInfo.getContainerInfo().getUseCustomDockerCommandShell()) {
+        if (request.request.slaveInfo.getContainerInfo() != null
+                && request.request.slaveInfo.getContainerInfo().getUseCustomDockerCommandShell()) {
             // Ref http://mesos.apache.org/documentation/latest/upgrades
             // regarding setting the shell value, and the impact on the command to be
             // launched
             String customShell = request.request.slaveInfo.getContainerInfo().getCustomDockerCommandShell();
-            if (StringUtils.stripToNull(customShell)==null) {
+            if (StringUtils.stripToNull(customShell) == null) {
                 throw new IllegalArgumentException("Invalid custom shell argument supplied  ");
             }
 
-            LOGGER.fine( String.format( "About to use custom shell: %s " , customShell));
+            LOGGER.fine(String.format("About to use custom shell: %s ", customShell));
             commandBuilder.setShell(false);
             commandBuilder.setValue(customShell);
             List<String> args = new ArrayList<String>();
             args.add(jenkinsCommand2Run);
+<<<<<<< HEAD
             commandBuilder.addAllArguments( args );
+=======
+            commandBuilder.addAllArguments(args);
+
+>>>>>>> master
         } else {
             LOGGER.fine("About to use default shell ....");
             commandBuilder.setValue(jenkinsCommand2Run);
         }
 
-        commandBuilder.addUris(
-                CommandInfo.URI.newBuilder().setValue(
-                        joinPaths(jenkinsMaster, SLAVE_JAR_URI_SUFFIX)).setExecutable(false).setExtract(false));
+        commandBuilder.addUris(CommandInfo.URI.newBuilder().setValue(joinPaths(jenkinsMaster, SLAVE_JAR_URI_SUFFIX))
+                .setExecutable(false).setExtract(false));
         return commandBuilder;
     }
 
     /**
-     * Checks if the given taskId already exists or just finished running. If it has, then refuse the offer.
+     * Checks if the given taskId already exists or just finished running. If it
+     * has, then refuse the offer.
+     * 
      * @param taskId The task id
      * @return True if the task already exists, false otherwise
      */
@@ -1002,7 +995,8 @@ public class JenkinsScheduler implements Scheduler {
             return true;
         }
 
-        // If the task has already finished, then do not start it up again even if we are offered it
+        // If the task has already finished, then do not start it up again even if we
+        // are offered it
         if (finishedTasks.contains(taskId)) {
             LOGGER.info("Task " + taskId.getValue() + " has already finished. Ignoring and refusing offer");
             return true;
@@ -1020,11 +1014,12 @@ public class JenkinsScheduler implements Scheduler {
     @Override
     public void statusUpdate(SchedulerDriver driver, TaskStatus status) {
         TaskID taskId = status.getTaskId();
-        LOGGER.fine("Status update: task " + taskId + " is in state " + status.getState() +
-                (status.hasMessage() ? " with message '" + status.getMessage() + "'" : ""));
+        LOGGER.fine("Status update: task " + taskId + " is in state " + status.getState()
+                + (status.hasMessage() ? " with message '" + status.getMessage() + "'" : ""));
 
         if (!results.containsKey(taskId)) {
-            // The task might not be present in the 'results' map if this is a duplicate terminal
+            // The task might not be present in the 'results' map if this is a duplicate
+            // terminal
             // update.
             LOGGER.fine("Ignoring status update " + status.getState() + " for unknown task " + taskId);
             return;
@@ -1034,25 +1029,25 @@ public class JenkinsScheduler implements Scheduler {
         boolean terminalState = false;
 
         switch (status.getState()) {
-            case TASK_STAGING:
-            case TASK_STARTING:
-                break;
-            case TASK_RUNNING:
-                result.result.running(result.slave);
-                break;
-            case TASK_FINISHED:
-                result.result.finished(result.slave);
-                terminalState = true;
-                break;
-            case TASK_ERROR:
-            case TASK_FAILED:
-            case TASK_KILLED:
-            case TASK_LOST:
-                result.result.failed(result.slave);
-                terminalState = true;
-                break;
-            default:
-                throw new IllegalStateException("Invalid State: " + status.getState());
+        case TASK_STAGING:
+        case TASK_STARTING:
+            break;
+        case TASK_RUNNING:
+            result.result.running(result.slave);
+            break;
+        case TASK_FINISHED:
+            result.result.finished(result.slave);
+            terminalState = true;
+            break;
+        case TASK_ERROR:
+        case TASK_FAILED:
+        case TASK_KILLED:
+        case TASK_LOST:
+            result.result.failed(result.slave);
+            terminalState = true;
+            break;
+        default:
+            throw new IllegalStateException("Invalid State: " + status.getState());
         }
 
         if (terminalState) {
@@ -1065,10 +1060,8 @@ public class JenkinsScheduler implements Scheduler {
     }
 
     @Override
-    public void frameworkMessage(SchedulerDriver driver, ExecutorID executorId,
-                                 SlaveID slaveId, byte[] data) {
-        LOGGER.info("Received framework message from executor " + executorId
-                + " of slave " + slaveId);
+    public void frameworkMessage(SchedulerDriver driver, ExecutorID executorId, SlaveID slaveId, byte[] data) {
+        LOGGER.info("Received framework message from executor " + executorId + " of slave " + slaveId);
     }
 
     @Override
@@ -1077,8 +1070,7 @@ public class JenkinsScheduler implements Scheduler {
     }
 
     @Override
-    public void executorLost(SchedulerDriver driver, ExecutorID executorId,
-                             SlaveID slaveId, int status) {
+    public void executorLost(SchedulerDriver driver, ExecutorID executorId, SlaveID slaveId, int status) {
         LOGGER.info("Executor " + executorId + " of slave " + slaveId + " lost!");
     }
 
@@ -1135,8 +1127,8 @@ public class JenkinsScheduler implements Scheduler {
     }
 
     /**
-     * Disconnect framework, if we don't have active mesos slaves. Also, make
-     * sure JenkinsScheduler's request queue is empty.
+     * Disconnect framework, if we don't have active mesos slaves. Also, make sure
+     * JenkinsScheduler's request queue is empty.
      */
     public static void supervise() {
         try {
@@ -1161,10 +1153,11 @@ public class JenkinsScheduler implements Scheduler {
                             scheduler.clearResults();
                             activeTasks = false;
                         }
-                        LOGGER.fine("Active slaves: " + activeSlaves
-                                + " | Pending tasks: " + pendingTasks + " | Active tasks: " + activeTasks);
+                        LOGGER.fine("Active slaves: " + activeSlaves + " | Pending tasks: " + pendingTasks
+                                + " | Active tasks: " + activeTasks);
                         if (!activeTasks && !activeSlaves && !pendingTasks) {
-                            LOGGER.info("No active tasks, or slaves or pending slave requests. Stopping the scheduler.");
+                            LOGGER.info(
+                                    "No active tasks, or slaves or pending slave requests. Stopping the scheduler.");
                             cloud.stopScheduler();
                         }
                     } else {
