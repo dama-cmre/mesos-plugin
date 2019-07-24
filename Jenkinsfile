@@ -1,2 +1,21 @@
-// Build the plugin using https://github.com/jenkins-infra/pipeline-library
-buildPlugin(jenkinsVersions: [null, '2.107.1'])
+pipeline {
+    agent docker-maven
+
+    stages {
+        stage('Build') {
+            steps {
+                sh 'mvn -B -DskipTests clean package'
+            }
+        }
+
+        stage('Test') {
+            steps {
+                sh 'mvn test'
+            }
+        }
+
+        stage('Publish') {
+        }
+    }
+}
+
