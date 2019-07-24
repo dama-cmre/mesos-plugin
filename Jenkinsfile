@@ -1,5 +1,7 @@
 pipeline {
-    agent docker-maven
+    agent {
+        label 'docker-maven'
+    }
 
     stages {
         stage('Build') {
@@ -12,9 +14,6 @@ pipeline {
             steps {
                 sh 'mvn test'
             }
-        }
-
-        stage('Publish') {
         }
     }
 }
