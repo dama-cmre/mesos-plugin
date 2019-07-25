@@ -22,8 +22,6 @@ import hudson.slaves.SlaveComputer;
 import java.io.IOException;
 import java.util.logging.Logger;
 
-import javax.servlet.ServletException;
-
 import jenkins.model.Jenkins;
 import jenkins.slaves.EncryptedSlaveAgentJnlpFile;
 
@@ -83,7 +81,7 @@ public class MesosComputer extends SlaveComputer {
 
     @NonNull
     private static Jenkins getJenkins() {
-        Jenkins jenkins = Jenkins.getInstance();
+        Jenkins jenkins = Jenkins.get();
         if (jenkins == null) {
             throw new IllegalStateException("Jenkins is null");
         }

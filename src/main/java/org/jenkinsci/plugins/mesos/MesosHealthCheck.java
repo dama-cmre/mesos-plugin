@@ -19,7 +19,7 @@ public class MesosHealthCheck extends HealthCheck {
     }
 
     private MesosAdministrativeMonitor getAdministrativeMonitor() {
-        Jenkins instance = Jenkins.getInstance();
+        Jenkins instance = Jenkins.get();
         if (instance == null) {
             return null;
         }

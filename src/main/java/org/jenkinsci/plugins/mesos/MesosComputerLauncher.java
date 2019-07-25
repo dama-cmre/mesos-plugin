@@ -36,7 +36,7 @@ public class MesosComputerLauncher extends JNLPLauncher {
   private static final Logger LOGGER = Logger.getLogger(MesosComputerLauncher.class.getName());
 
   public MesosComputerLauncher(MesosCloud cloud, String _name) {
-    super();
+    super(false);
     LOGGER.finer("Constructing MesosComputerLauncher");
     this.cloud = cloud;
     this.state = State.INIT;
