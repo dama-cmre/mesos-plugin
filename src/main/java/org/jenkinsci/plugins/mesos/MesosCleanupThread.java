@@ -67,7 +67,7 @@ public class MesosCleanupThread extends AsyncPeriodicWork {
 
     @NonNull
     private static Jenkins getJenkins() {
-        Jenkins jenkins = Jenkins.get();
+        Jenkins jenkins = Jenkins.getInstance();
         if (jenkins == null) {
             throw new IllegalStateException("Jenkins is null");
         }

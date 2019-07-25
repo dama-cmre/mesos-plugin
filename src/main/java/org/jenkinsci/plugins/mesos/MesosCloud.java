@@ -140,7 +140,7 @@ public class MesosCloud extends Cloud {
 
   @NonNull
   private static Jenkins getJenkins() {
-    Jenkins jenkins = Jenkins.get();
+    Jenkins jenkins = Jenkins.getInstance();
     if (jenkins == null) {
       throw new IllegalStateException("Jenkins is null");
     }
@@ -599,7 +599,7 @@ public class MesosCloud extends Cloud {
   }
 
   public static MesosCloud get() {
-    return Jenkins.get().clouds.get(MesosCloud.class);
+    return Jenkins.getInstance().clouds.get(MesosCloud.class);
   }
 
   /**
@@ -729,7 +729,7 @@ public class MesosCloud extends Cloud {
     @SuppressWarnings("unused") // Used by stapler.
     @RequirePOST
     public ListBoxModel doFillCredentialsIdItems(@AncestorInPath Item item, @QueryParameter String master) {
-      Jenkins.get().checkPermission(Jenkins.ADMINISTER);
+      Jenkins.getInstance().checkPermission(Jenkins.ADMINISTER);
       List<DomainRequirement> domainRequirements = (master == null) ? Collections.<DomainRequirement>emptyList()
           : URIRequirementBuilder.fromUri(master.trim()).build();
       return new StandardListBoxModel().withEmptySelection()
@@ -790,7 +790,7 @@ public class MesosCloud extends Cloud {
     }
 
     public FormValidation doCheckDiskNeeded(@QueryParameter String value) {
-      Jenkins.get().checkPermission(Jenkins.ADMINISTER);
+      Jenkins.getInstance().checkPermission(Jenkins.ADMINISTER);
       boolean isValid = true;
       String errorMessage = "Invalid disk space entered. It should be a positive decimal.";
 
@@ -809,7 +809,7 @@ public class MesosCloud extends Cloud {
     }
 
     private FormValidation doCheckCpus(@QueryParameter String value) {
-      Jenkins.get().checkPermission(Jenkins.ADMINISTER);
+      Jenkins.getInstance().checkPermission(Jenkins.ADMINISTER);
       boolean valid = true;
       String errorMessage = "Invalid CPUs value, it should be a positive decimal.";
 
@@ -828,7 +828,7 @@ public class MesosCloud extends Cloud {
     }
 
     public FormValidation doCheckRemoteFSRoot(@QueryParameter String value) {
-      Jenkins.get().checkPermission(Jenkins.ADMINISTER);
+      Jenkins.getInstance().checkPermission(Jenkins.ADMINISTER);
       String errorMessage = "Invalid Remote FS Root - should be non-empty. It will be defaulted to \"jenkins\".";
 
       return StringUtils.isNotBlank(value) ? FormValidation.ok() : FormValidation.error(errorMessage);

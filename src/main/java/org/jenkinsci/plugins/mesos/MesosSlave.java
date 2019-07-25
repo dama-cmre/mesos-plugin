@@ -77,7 +77,7 @@ public class MesosSlave extends Slave {
   }
 
   private Jenkins getJenkins() {
-    Jenkins jenkins = Jenkins.get();
+    Jenkins jenkins = Jenkins.getInstance();
     if (jenkins == null) {
       throw new IllegalStateException("Jenkins is null");
     }
@@ -113,7 +113,7 @@ public class MesosSlave extends Slave {
     LOGGER.info("Terminating slave " + getNodeName());
     try {
       // Remove the node from hudson.
-      Jenkins.get().removeNode(this);
+      Hudson.getInstance().removeNode(this);
 
       ComputerLauncher launcher = getLauncher();
 

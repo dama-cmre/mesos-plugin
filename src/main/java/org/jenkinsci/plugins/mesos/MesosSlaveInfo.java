@@ -37,7 +37,7 @@ public class MesosSlaveInfo extends AbstractDescribableImpl<MesosSlaveInfo> {
   @Extension
   public static class DescriptorImpl extends Descriptor<MesosSlaveInfo> {
     public FormValidation doCheckMinExecutors(@QueryParameter String minExecutors, @QueryParameter String maxExecutors) {
-      Jenkins.get().checkPermission(Jenkins.ADMINISTER);
+      Jenkins.getInstance().checkPermission(Jenkins.ADMINISTER);
       int minExecutorsVal = Integer.parseInt(minExecutors);
       int maxExecutorsVal = Integer.parseInt(maxExecutors);
 
@@ -53,7 +53,7 @@ public class MesosSlaveInfo extends AbstractDescribableImpl<MesosSlaveInfo> {
     }
 
     public FormValidation doCheckMaxExecutors(@QueryParameter String minExecutors, @QueryParameter String maxExecutors) {
-      Jenkins.get().checkPermission(Jenkins.ADMINISTER);
+      Jenkins.getInstance().checkPermission(Jenkins.ADMINISTER);
       int minExecutorsVal = Integer.parseInt(minExecutors);
       int maxExecutorsVal = Integer.parseInt(maxExecutors);
 
@@ -99,7 +99,7 @@ public class MesosSlaveInfo extends AbstractDescribableImpl<MesosSlaveInfo> {
   private final ContainerInfo containerInfo;
   private final List<URI> additionalURIs;
   private final Mode mode;
-  private /*almost final*/ DescribableList<NodeProperty<?>,NodePropertyDescriptor> nodeProperties = new DescribableList<NodeProperty<?>,NodePropertyDescriptor>(Jenkins.get());
+  private /*almost final*/ DescribableList<NodeProperty<?>,NodePropertyDescriptor> nodeProperties = new DescribableList<NodeProperty<?>,NodePropertyDescriptor>(Jenkins.getInstance());
 
   @CheckForNull
   private String labelString;
@@ -415,7 +415,7 @@ public class MesosSlaveInfo extends AbstractDescribableImpl<MesosSlaveInfo> {
 
   public Object readResolve() {
     if (nodeProperties == null) {
-      nodeProperties = new DescribableList<NodeProperty<?>,NodePropertyDescriptor>(Jenkins.get());
+      nodeProperties = new DescribableList<NodeProperty<?>,NodePropertyDescriptor>(Jenkins.getInstance());
     }
     if (minExecutors == 0) {
       this.minExecutors = 1;

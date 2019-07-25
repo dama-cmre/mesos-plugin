@@ -324,15 +324,11 @@ public class JenkinsScheduler implements Scheduler {
         reArrangeOffersBasedOnAffinity(offers);
         int processedRequests = 0;
         for (Offer offer : offers) {
-            if (offer == null) {
-                LOGGER.warning("Null offer!");
-                continue;
-            }
             Metrics.metricRegistry().meter("mesos.scheduler.offer.processed").mark();
             final Timer.Context offerContext = Metrics.metricRegistry().timer("mesos.scheduler.offer.processing.time")
                     .time();
             try {
-                if (requests.isEmpty() && !buildsInQueue(Jenkins.get().getQueue())) {
+                if (requests.isEmpty() && !buildsInQueue(Jenkins.getInstance().getQueue())) {
                     unmatchedLabels.clear();
                     // Decline offer for a longer period if no slave is waiting to get spawned.
                     // This prevents unnecessarily getting offers every few seconds and causing
@@ -769,7 +765,7 @@ public class JenkinsScheduler implements Scheduler {
 
     @NonNull
     private static Jenkins getJenkins() {
-        Jenkins jenkins = Jenkins.get();
+        Jenkins jenkins = Jenkins.getInstance();
         if (jenkins == null) {
             throw new IllegalStateException("Jenkins is null");
         }
