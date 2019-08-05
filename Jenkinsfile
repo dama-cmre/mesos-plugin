@@ -1,6 +1,6 @@
 pipeline {
     agent {
-        label 'mesos-docker-maven'
+        label 'mesos_docker_maven'
     }
 
     stages {
