@@ -91,7 +91,6 @@ public class MesosSlaveInfo extends AbstractDescribableImpl<MesosSlaveInfo> {
   private final String jvmArgs;
   private final String jnlpArgs;
   private final boolean defaultSlave;
-  private final boolean windowsAgent;
   // Slave attributes JSON representation.
   private String slaveAttributesString;
   @Deprecated
@@ -180,7 +179,6 @@ public class MesosSlaveInfo extends AbstractDescribableImpl<MesosSlaveInfo> {
       String jvmArgs,
       String jnlpArgs,
       String defaultSlave,
-      String windowsAgent,
       ContainerInfo containerInfo,
       List<URI> additionalURIs,
       List<? extends NodeProperty<?>> nodeProperties)
@@ -202,7 +200,6 @@ public class MesosSlaveInfo extends AbstractDescribableImpl<MesosSlaveInfo> {
               StringUtils.isNotBlank(jvmArgs) ? cleanseJvmArgs(jvmArgs) : DEFAULT_JVM_ARGS,
               StringUtils.isNotBlank(jnlpArgs) ? jnlpArgs : "",
               Boolean.valueOf(defaultSlave),
-              Boolean.valueOf(windowsAgent),
               containerInfo,
               additionalURIs,
               nodeProperties);
@@ -224,7 +221,6 @@ public class MesosSlaveInfo extends AbstractDescribableImpl<MesosSlaveInfo> {
       String jvmArgs,
       String jnlpArgs,
       Boolean defaultSlave,
-      Boolean windowsAgent,
       ContainerInfo containerInfo,
       List<URI> additionalURIs,
       List<? extends NodeProperty<?>> nodeProperties)
@@ -244,7 +240,6 @@ public class MesosSlaveInfo extends AbstractDescribableImpl<MesosSlaveInfo> {
       this.jvmArgs = jvmArgs;
       this.jnlpArgs = jnlpArgs;
       this.defaultSlave = defaultSlave;
-      this.windowsAgent = windowsAgent;
       this.containerInfo = containerInfo;
       this.additionalURIs = additionalURIs;
       this.nodeProperties.replaceBy(nodeProperties == null ? new ArrayList<NodeProperty<?>>() : nodeProperties);
@@ -286,7 +281,6 @@ public class MesosSlaveInfo extends AbstractDescribableImpl<MesosSlaveInfo> {
               jvmArgs,
               jnlpArgs,
               defaultSlave,
-              windowsAgent,
               containerInfo.copyWithDockerImage(dockerImage),
               additionalURIs,
               nodeProperties
@@ -355,10 +349,6 @@ public class MesosSlaveInfo extends AbstractDescribableImpl<MesosSlaveInfo> {
 
   public boolean isDefaultSlave() {
     return defaultSlave;
-  }
-
-  public boolean isWindowsAgent() {
-    return windowsAgent;
   }
 
   public ContainerInfo getContainerInfo() {

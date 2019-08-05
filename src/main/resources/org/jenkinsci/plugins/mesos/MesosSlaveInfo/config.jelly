@@ -67,10 +67,6 @@
         <f:checkbox onclick="checkDefaultSlave(this)"/>
     </f:entry>
 
-    <f:entry title="${%Mark this Agent Info to use a node running windows}" field="windowsAgent">
-        <f:checkbox/>
-    </f:entry>
-
     <f:advanced>
         <f:optionalProperty title="${%Use Docker Containerizer}" field="containerInfo"/>
         <f:entry title="${%Additional URIs}">

@@ -62,7 +62,7 @@ public class JenkinsScheduler implements Scheduler {
     // overhead.
     private static final double JVM_MEM_OVERHEAD_FACTOR = 0.1;
 
-    private static final String SLAVE_COMMAND_FORMAT =
+    private static final String AGENT_COMMAND_FORMAT =
         "java -DHUDSON_HOME=jenkins -server -Xmx%dm %s -jar ./agent.jar %s %s -jnlpUrl %s";
     private static final String JNLP_SECRET_FORMAT = "-secret %s";
     public static final String PORT_RESOURCE_NAME = "ports";
@@ -921,9 +921,9 @@ public class JenkinsScheduler implements Scheduler {
         return commandBuilder;
     }
 
-    String generateJenkinsCommand2Run(int jvmMem,String jvmArgString,String jnlpArgString,String slaveName, boolean isWindows) {
+    String generateJenkinsCommand2Run(int jvmMem,String jvmArgString,String jnlpArgString,String slaveName) {
 
-        return String.format(isWindows ? WIN_AGENT_COMMAND_FORMAT : SLAVE_COMMAND_FORMAT,
+        return String.format(AGENT_COMMAND_FORMAT,
                 jvmMem,
                 jvmArgString,
                 jnlpArgString,
@@ -938,8 +938,7 @@ public class JenkinsScheduler implements Scheduler {
                 request.request.slaveInfo.getSlaveMem(),
                 request.request.slaveInfo.getJvmArgs(),
                 request.request.slaveInfo.getJnlpArgs(),
-                request.request.slave.name,
-                request.request.slaveInfo.isWindowsAgent());
+                request.request.slave.name);
 
         LOGGER.info(String.format("Using command line argument: %s", jenkinsCommand2Run));
 

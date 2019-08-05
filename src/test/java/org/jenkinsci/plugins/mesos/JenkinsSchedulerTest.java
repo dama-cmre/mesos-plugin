@@ -353,8 +353,7 @@ public class JenkinsSchedulerTest {
                 TEST_JENKINS_SLAVE_MEM,
                 TEST_JENKINS_SLAVE_ARG,
                 TEST_JENKINS_JNLP_ARG,
-                TEST_JENKINS_SLAVE_NAME,
-                false);
+                TEST_JENKINS_SLAVE_NAME);
         assertEquals("jenkins command to run should be specified as value", jenkinsCommand2Run, commandInfo.getValue());
         assertEquals("mesos command should have no args specified by default", 0, commandInfo.getArgumentsCount());
     }
@@ -371,8 +370,7 @@ public class JenkinsSchedulerTest {
                 TEST_JENKINS_SLAVE_MEM,
                 TEST_JENKINS_SLAVE_ARG,
                 TEST_JENKINS_JNLP_ARG,
-                TEST_JENKINS_SLAVE_NAME,
-                false);
+                TEST_JENKINS_SLAVE_NAME);
         assertEquals("jenkins command to run should be specified as value", jenkinsCommand2Run, commandInfo.getValue());
         assertEquals("mesos command should have no args specified by default", 0, commandInfo.getArgumentsCount());
     }
@@ -390,8 +388,7 @@ public class JenkinsSchedulerTest {
                 TEST_JENKINS_SLAVE_MEM,
                 TEST_JENKINS_SLAVE_ARG,
                 TEST_JENKINS_JNLP_ARG,
-                TEST_JENKINS_SLAVE_NAME,
-                false);
+                TEST_JENKINS_SLAVE_NAME);
 
         assertEquals("args should now consist of the single original command ", 1, commandInfo.getArgumentsCount());
         assertEquals("args should now consist of the original command ", jenkinsCommand2Run, commandInfo.getArguments(0));
@@ -478,7 +475,6 @@ public class JenkinsSchedulerTest {
                 null,               // jvmArgs,
                 null,               // jnlpArgs,
                 null,               // defaultSlave,
-                null,               // windowsAgent,
                 containerInfo,      // containerInfo,
                 null,              // additionalURIs
                 null              // nodeProperties

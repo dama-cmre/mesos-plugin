@@ -89,7 +89,6 @@ public class MesosSlaveInfoTest {
                 "",
                 "",
                 "false",
-                "false",
                 container,
                 new LinkedList<MesosSlaveInfo.URI>(),
                 new ArrayList<NodeProperty<?>>()
