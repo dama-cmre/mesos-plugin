@@ -43,6 +43,7 @@
           <jvmArgs>-Xms16m -XX:+UseConcMarkSweepGC -Djava.net.preferIPv4Stack=true</jvmArgs>
           <jnlpArgs>-noReconnect</jnlpArgs>
           <defaultSlave>false</defaultSlave>
+          <windowsAgent>false</windowsAgent>
           <slaveAttributes>
             <nullObject>false</nullObject>
             <properties class="org.apache.commons.collections.map.ListOrderedMap" serialization="custom">
