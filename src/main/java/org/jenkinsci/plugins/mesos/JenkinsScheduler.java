@@ -63,7 +63,9 @@ public class JenkinsScheduler implements Scheduler {
     private static final double JVM_MEM_OVERHEAD_FACTOR = 0.1;
 
     private static final String SLAVE_COMMAND_FORMAT =
-        "java -DHUDSON_HOME=jenkins -server -Xmx%dm %s -jar ./agent.jar %s %s -jnlpUrl %s";
+        "java -DHUDSON_HOME=jenkins -server -Xmx%dm %s -jar ${MESOS_SANDBOX-.}/agent.jar %s %s -jnlpUrl %s";
+    private static final String WIN_AGENT_COMMAND_FORMAT = 
+        "%%JAVA_HOME%%/bin/java -DHUDSON_HOME=jenkins -server -Xmx%dm %s -jar %%MESOS_SANDBOX%%/agent.jar %s %s -jnlpUrl %s";
     private static final String JNLP_SECRET_FORMAT = "-secret %s";
     public static final String PORT_RESOURCE_NAME = "ports";
     public static final String MESOS_DEFAULT_ROLE = "*";
@@ -313,9 +315,7 @@ public class JenkinsScheduler implements Scheduler {
     private void declineOffer(Offer offer, double duration) {
         LOGGER.fine("Rejecting offer " + offer.getId().getValue() + " for " + duration + " seconds");
         Filters filters = Filters.newBuilder().setRefuseSeconds(duration).build();
-        if (driver != null) {
-            driver.declineOffer(offer.getId(), filters);
-        }
+        driver.declineOffer(offer.getId(), filters);
     }
 
     private void processOffers() {
@@ -940,8 +940,6 @@ public class JenkinsScheduler implements Scheduler {
                 request.request.slaveInfo.getJnlpArgs(),
                 request.request.slave.name,
                 request.request.slaveInfo.isWindowsAgent());
-
-        LOGGER.info(String.format("Using command line argument: %s", jenkinsCommand2Run));
 
         if (request.request.slaveInfo.getContainerInfo() != null
                 && request.request.slaveInfo.getContainerInfo().getUseCustomDockerCommandShell()) {
