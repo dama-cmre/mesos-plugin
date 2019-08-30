@@ -24,7 +24,6 @@ import com.cloudbees.plugins.credentials.common.UsernamePasswordCredentials;
 import com.cloudbees.plugins.credentials.domains.DomainRequirement;
 import com.cloudbees.plugins.credentials.domains.URIRequirementBuilder;
 import com.cloudbees.plugins.credentials.impl.UsernamePasswordCredentialsImpl;
-import com.codahale.metrics.Timer;
 
 import edu.umd.cs.findbugs.annotations.NonNull;
 import hudson.Extension;
@@ -413,13 +412,9 @@ public class MesosCloud extends Cloud {
         LOGGER.info("Provisioning Jenkins Slave on Mesos with " + numExecutors
             + " executors. Remaining excess workload: " + excessWorkload + " executors)");
 
-        // Create a context that can be passed down through the provisioning process and
-        // finalized when
-        // the request is completely fulfilled.
-        Timer.Context context = Metrics.metricRegistry().timer(getMetricName(label, "provision", "submit")).time();
         list.add(new PlannedNode(this.getDisplayName(), Computer.threadPoolForRemoting.submit(new Callable<Node>() {
           public Node call() throws Exception {
-            MesosJenkinsAgent s = doProvision(numExecutors, slaveInfo, context);
+            MesosJenkinsAgent s = doProvision(numExecutors, slaveInfo);
 
             // We do not need to explicitly add the Node here because that is handled by
             // hudson.slaves.NodeProvisioner::update() that checks the result from the
@@ -437,10 +432,10 @@ public class MesosCloud extends Cloud {
     return list;
   }
 
-  private MesosJenkinsAgent doProvision(int numExecutors, MesosAgentSpecs slaveInfo, Timer.Context provisioningContext)
+  private MesosJenkinsAgent doProvision(int numExecutors, MesosAgentSpecs slaveInfo)
       throws Descriptor.FormException, IOException {
     return new MesosJenkinsAgent(this, MesosUtils.buildNodeName(slaveInfo.getLabelString()), numExecutors, slaveInfo,
-        provisioningContext, Collections.emptyList());
+        Collections.emptyList());
   }
 
   public List<MesosAgentSpecs> getSlaveInfos() {

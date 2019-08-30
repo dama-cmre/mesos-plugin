@@ -22,7 +22,6 @@ import edu.umd.cs.findbugs.annotations.NonNull;
 import hudson.model.Computer;
 import hudson.model.Node;
 import hudson.util.Secret;
-import jenkins.metrics.api.Metrics;
 import jenkins.model.Jenkins;
 import net.sf.json.JSONObject;
 import org.apache.commons.collections4.OrderedMapIterator;
@@ -191,15 +190,12 @@ public class JenkinsScheduler implements Scheduler {
     }
 
     public synchronized void requestJenkinsSlave(Mesos.SlaveRequest request, Mesos.SlaveResult result) {
-        Metrics.metricRegistry().meter("mesos.scheduler.slave.requests").mark();
         LOGGER.fine("Enqueuing jenkins slave request");
         requests.add(new Request(request, result));
         if (driver != null) {
             // Ask mesos to send all offers, even the those we declined earlier.
             // See comment in resourceOffers() for further details.
-            Timer.Context ctx = Metrics.metricRegistry().timer("mesos.scheduler.revives").time();
             driver.reviveOffers();
-            ctx.stop();
         }
     }
 
@@ -306,7 +302,6 @@ public class JenkinsScheduler implements Scheduler {
     }
 
     private void declineShort(Offer offer) {
-        Metrics.metricRegistry().meter("mesos.scheduler.decline.short").mark();
         declineOffer(offer, MesosCloud.SHORT_DECLINE_OFFER_DURATION_SEC);
     }
 
@@ -326,54 +321,41 @@ public class JenkinsScheduler implements Scheduler {
                 LOGGER.warning("Null offer!!");
                 continue;
             }
-            Metrics.metricRegistry().meter("mesos.scheduler.offer.processed").mark();
-            final Timer.Context offerContext = Metrics.metricRegistry().timer("mesos.scheduler.offer.processing.time")
-                    .time();
-            try {
-                if (requests.isEmpty() && !buildsInQueue(Jenkins.getInstance().getQueue())) {
-                    unmatchedLabels.clear();
-                    // Decline offer for a longer period if no slave is waiting to get spawned.
-                    // This prevents unnecessarily getting offers every few seconds and causing
-                    // starvation when running a lot of frameworks.
-                    Metrics.metricRegistry().meter("mesos.scheduler.decline.long").mark();
-                    LOGGER.info("No slave in queue.");
-                    declineOffer(offer, mesosCloud.getDeclineOfferDurationDouble());
-                    continue;
-                }
+            if (requests.isEmpty() && !buildsInQueue(Jenkins.get().getQueue())) {
+                unmatchedLabels.clear();
+                // Decline offer for a longer period if no slave is waiting to get spawned.
+                // This prevents unnecessarily getting offers every few seconds and causing
+                // starvation when running a lot of frameworks.
+                LOGGER.info("No slave in queue.");
+                declineOffer(offer, mesosCloud.getDeclineOfferDurationDouble());
+                continue;
+            }
 
-                boolean taskCreated = false;
+            boolean taskCreated = false;
 
-                if (isOfferAvailable(offer)) {
-                    for (Request request : requests) {
-                        // TODO: Dirty modification of list while traversing it.
-                        if (matches(offer, request)) {
-                            Timer.Context ctx = Metrics.metricRegistry().timer("mesos.scheduler.offer.matched").time();
-                            LOGGER.info("Offer matched! Creating mesos task " + request.request.slave.name);
-                            try {
-                                createMesosTask(offer, request);
-                                unmatchedLabels.remove(request.request.slaveInfo.getLabelString());
-                                taskCreated = true;
-                                recentlyAcceptedOffers.put(offer.getSlaveId().getValue(), IGNORE);
-                            } catch (Exception e) {
-                                LOGGER.log(Level.SEVERE, e.getMessage(), e);
-                            } finally {
-                                ctx.stop();
-                            }
-                            requests.remove(request);
-                            processedRequests++;
-                            break;
+            if (isOfferAvailable(offer)) {
+                for (Request request : requests) {
+                    // TODO: Dirty modification of list while traversing it.
+                    if (matches(offer, request)) {
+                        LOGGER.info("Offer matched! Creating mesos task " + request.request.slave.name);
+                        try {
+                            createMesosTask(offer, request);
+                            unmatchedLabels.remove(request.request.slaveInfo.getLabelString());
+                            taskCreated = true;
+                            recentlyAcceptedOffers.put(offer.getSlaveId().getValue(), IGNORE);
+                        } catch (Exception e) {
+                            LOGGER.log(Level.SEVERE, e.getMessage(), e);
                         }
+                        requests.remove(request);
+                        processedRequests++;
+                        break;
                     }
-                } else {
-                    Metrics.metricRegistry().meter("mesos.scheduler.offer.unavailable").mark();
                 }
+            }
 
-                if (!taskCreated) {
-                    declineShort(offer);
-                    continue;
-                }
-            } finally {
-                offerContext.stop();
+            if (!taskCreated) {
+                declineShort(offer);
+                continue;
             }
         }
         if (processedRequests > 0) {
@@ -396,8 +378,6 @@ public class JenkinsScheduler implements Scheduler {
 
     @Override
     public synchronized void resourceOffers(SchedulerDriver driver, List<Offer> offers) {
-        Metrics.metricRegistry().meter("mesos.scheduler.offers.received").mark(offers.size());
-
         if (multiThreaded && !isProcessing()) {
             startProcessing();
         }
@@ -723,8 +703,6 @@ public class JenkinsScheduler implements Scheduler {
                 "Launching task " + taskId.getValue() + " with URI " + joinPaths(jenkinsMaster, SLAVE_JAR_URI_SUFFIX));
 
         if (isExistingTask(taskId)) {
-            // TODO: This almost certainly is causing additional latency in the system.
-            Metrics.metricRegistry().meter("mesos.scheduler.existing.task").mark();
             declineShort(offer);
             return;
         }
@@ -757,7 +735,6 @@ public class JenkinsScheduler implements Scheduler {
         List<TaskInfo> tasks = new ArrayList<TaskInfo>();
         tasks.add(taskBuilder.build());
 
-        Metrics.metricRegistry().counter("mesos.scheduler.operation.launch").inc(tasks.size());
         Filters filters = Filters.newBuilder().setRefuseSeconds(1).build();
         driver.launchTasks(offer.getId(), tasks, filters);
 
@@ -767,7 +744,7 @@ public class JenkinsScheduler implements Scheduler {
 
     @NonNull
     private static Jenkins getJenkins() {
-        Jenkins jenkins = Jenkins.getInstance();
+        Jenkins jenkins = Jenkins.get();
         if (jenkins == null) {
             throw new IllegalStateException("Jenkins is null");
         }

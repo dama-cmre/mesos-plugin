@@ -42,15 +42,13 @@ public class MesosJenkinsAgent extends AbstractCloudSlave {
   private final double cpus;
   private final int mem;
   private final double diskNeeded;
-  private transient final Timer.Context provisioningContext;
 
   private boolean pendingDelete;
 
   private static final Logger LOGGER = Logger.getLogger(MesosJenkinsAgent.class.getName());
 
   public MesosJenkinsAgent(MesosCloud cloud, String name, int numExecutors, MesosAgentSpecs spec,
-      Timer.Context provisioningContext, List<? extends NodeProperty<?>> nodeProperties)
-      throws IOException, FormException {
+      List<? extends NodeProperty<?>> nodeProperties) throws IOException, FormException {
     super(name, spec.getLabelString(),
         StringUtils.isBlank(spec.getRemoteFSRoot()) ? "jenkins" : spec.getRemoteFSRoot().trim(), "" + numExecutors,
         spec.getMode(), spec.getLabelString(), // Label.
@@ -63,7 +61,6 @@ public class MesosJenkinsAgent extends AbstractCloudSlave {
     this.cpus = spec.getSlaveCpus() + (numExecutors * spec.getExecutorCpus());
     this.mem = spec.getSlaveMem() + (numExecutors * spec.getExecutorMem());
     this.diskNeeded = spec.getdiskNeeded();
-    this.provisioningContext = provisioningContext;
     LOGGER.fine("Constructing Mesos slave " + name + " from cloud " + cloud.getDescription());
   }
 
@@ -100,10 +97,6 @@ public class MesosJenkinsAgent extends AbstractCloudSlave {
 
   public int getIdleTerminationMinutes() {
     return idleTerminationMinutes;
-  }
-
-  public Timer.Context getProvisioningContext() {
-    return provisioningContext;
   }
 
   /**
@@ -219,8 +212,6 @@ public class MesosJenkinsAgent extends AbstractCloudSlave {
           }
         }
         if (!candidateInUse) {
-          // Save the workspace folder name so that user can view the workspace through MesosWorkspaceBrowser even after slave goes offline
-          MesosRecentWSTracker.getMesosRecentWSTracker().updateRecentWorkspaceMap(item.getName(), candidate.getName());
           return candidate;
         }
 

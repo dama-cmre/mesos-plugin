@@ -1,7 +1,6 @@
 package org.jenkinsci.plugins.mesos;
 
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.logging.Level;
@@ -27,9 +26,6 @@ import hudson.model.Descriptor.FormException;
 import hudson.model.Label;
 import hudson.model.Node;
 import hudson.model.Node.Mode;
-import hudson.slaves.NodeProperty;
-import hudson.slaves.NodePropertyDescriptor;
-import hudson.util.DescribableList;
 import hudson.util.FormValidation;
 import jenkins.model.Jenkins;
 
@@ -100,86 +96,11 @@ public class MesosAgentSpecs extends AbstractDescribableImpl<MesosAgentSpecs> {
   private final ContainerInfo containerInfo;
   private final List<URI> additionalURIs;
   private final Mode mode;
-  //  private /*almost final*/ DescribableList<NodeProperty<?>, NodePropertyDescriptor> nodeProperties = new DescribableList<NodeProperty<?>, NodePropertyDescriptor>(
-  //      Jenkins.get());
 
   @CheckForNull
   private String labelString;
 
   private static final Logger LOGGER = Logger.getLogger(MesosAgentSpecs.class.getName());
-
-  @Override
-  public boolean equals(Object o) {
-    if (this == o)
-      return true;
-    if (o == null || getClass() != o.getClass())
-      return false;
-
-    MesosAgentSpecs that = (MesosAgentSpecs) o;
-
-    if (Double.compare(that.slaveCpus, slaveCpus) != 0)
-      return false;
-    if (slaveMem != that.slaveMem)
-      return false;
-    if (Double.compare(that.executorCpus, executorCpus) != 0)
-      return false;
-    if (Double.compare(that.diskNeeded, diskNeeded) != 0)
-      return false;
-    if (minExecutors != that.minExecutors)
-      return false;
-    if (maxExecutors != that.maxExecutors)
-      return false;
-    if (executorMem != that.executorMem)
-      return false;
-    if (idleTerminationMinutes != that.idleTerminationMinutes)
-      return false;
-    if (remoteFSRoot != null ? !remoteFSRoot.equals(that.remoteFSRoot) : that.remoteFSRoot != null)
-      return false;
-    if (jvmArgs != null ? !jvmArgs.equals(that.jvmArgs) : that.jvmArgs != null)
-      return false;
-    if (jnlpArgs != null ? !jnlpArgs.equals(that.jnlpArgs) : that.jnlpArgs != null)
-      return false;
-    if (slaveAttributesString != null ? !slaveAttributesString.equals(that.slaveAttributesString)
-        : that.slaveAttributesString != null)
-      return false;
-    if (containerInfo != null ? !containerInfo.equals(that.containerInfo) : that.containerInfo != null)
-      return false;
-    if (additionalURIs != null ? !additionalURIs.equals(that.additionalURIs) : that.additionalURIs != null)
-      return false;
-    if (mode != that.mode)
-      return false;
-    // if (nodeProperties != null ? !nodeProperties.equals(that.nodeProperties) : that.nodeProperties != null)
-    //   return false;
-    return labelString != null ? labelString.equals(that.labelString) : that.labelString == null;
-
-  }
-
-  @Override
-  public int hashCode() {
-    int result;
-    long temp;
-    temp = Double.doubleToLongBits(slaveCpus);
-    result = (int) (temp ^ (temp >>> 32));
-    result = 31 * result + slaveMem;
-    temp = Double.doubleToLongBits(executorCpus);
-    result = 31 * result + (int) (temp ^ (temp >>> 32));
-    temp = Double.doubleToLongBits(diskNeeded);
-    result = 31 * result + (int) (temp ^ (temp >>> 32));
-    result = 31 * result + minExecutors;
-    result = 31 * result + maxExecutors;
-    result = 31 * result + executorMem;
-    result = 31 * result + (remoteFSRoot != null ? remoteFSRoot.hashCode() : 0);
-    result = 31 * result + idleTerminationMinutes;
-    result = 31 * result + (jvmArgs != null ? jvmArgs.hashCode() : 0);
-    result = 31 * result + (jnlpArgs != null ? jnlpArgs.hashCode() : 0);
-    result = 31 * result + (slaveAttributesString != null ? slaveAttributesString.hashCode() : 0);
-    result = 31 * result + (containerInfo != null ? containerInfo.hashCode() : 0);
-    result = 31 * result + (additionalURIs != null ? additionalURIs.hashCode() : 0);
-    result = 31 * result + (mode != null ? mode.hashCode() : 0);
-    // result = 31 * result + (nodeProperties != null ? nodeProperties.hashCode() : 0);
-    result = 31 * result + (labelString != null ? labelString.hashCode() : 0);
-    return result;
-  }
 
   @DataBoundConstructor
   public MesosAgentSpecs(String labelString, Mode mode, String slaveCpus, String slaveMem, String minExecutors,
@@ -201,9 +122,7 @@ public class MesosAgentSpecs extends AbstractDescribableImpl<MesosAgentSpecs> {
   public MesosAgentSpecs(String labelString, Mode mode, double slaveCpus, int slaveMem, int minExecutors,
       int maxExecutors, double executorCpus, double diskNeeded, int executorMem, String remoteFSRoot,
       int idleTerminationMinutes, JSONObject slaveAttributes, String jvmArgs, String jnlpArgs, Boolean defaultSlave,
-      Boolean windowsAgent, ContainerInfo containerInfo,
-      List<URI> additionalURIs/*,
-                              List<? extends NodeProperty<?>> nodeProperties*/)
+      Boolean windowsAgent, ContainerInfo containerInfo, List<URI> additionalURIs)
       throws IOException, NumberFormatException {
     this.labelString = labelString;
     this.mode = mode;
@@ -223,7 +142,6 @@ public class MesosAgentSpecs extends AbstractDescribableImpl<MesosAgentSpecs> {
     this.windowsAgent = windowsAgent;
     this.containerInfo = containerInfo;
     this.additionalURIs = additionalURIs;
-    //    this.nodeProperties.replaceBy(nodeProperties == null ? new ArrayList<NodeProperty<?>>() : nodeProperties);
   }
 
   private static JSONObject parseSlaveAttributes(String slaveAttributes) {
@@ -248,8 +166,7 @@ public class MesosAgentSpecs extends AbstractDescribableImpl<MesosAgentSpecs> {
     try {
       return new MesosAgentSpecs(label, mode, slaveCpus, slaveMem, minExecutors, maxExecutors, executorCpus, diskNeeded,
           executorMem, remoteFSRoot, idleTerminationMinutes, parseSlaveAttributes(slaveAttributesString), jvmArgs,
-          jnlpArgs, defaultSlave, windowsAgent, containerInfo.copyWithDockerImage(dockerImage), additionalURIs
-      /* nodeProperties */);
+          jnlpArgs, defaultSlave, windowsAgent, containerInfo.copyWithDockerImage(dockerImage), additionalURIs);
     } catch (Descriptor.FormException e) {
       LOGGER.log(Level.WARNING, "Failed to create customized mesos container info", e);
       return null;
@@ -373,9 +290,6 @@ public class MesosAgentSpecs extends AbstractDescribableImpl<MesosAgentSpecs> {
   }
 
   public Object readResolve() {
-    // if (nodeProperties == null) {
-    //   nodeProperties = new DescribableList<NodeProperty<?>, NodePropertyDescriptor>(Jenkins.get());
-    // }
     if (minExecutors == 0) {
       this.minExecutors = 1;
     }
@@ -445,28 +359,6 @@ public class MesosAgentSpecs extends AbstractDescribableImpl<MesosAgentSpecs> {
 
     public String getImage() {
       return image;
-    }
-
-    @Override
-    public boolean equals(Object o) {
-      if (this == o)
-        return true;
-      if (o == null || getClass() != o.getClass())
-        return false;
-
-      ExternalContainerInfo that = (ExternalContainerInfo) o;
-
-      if (image != null ? !image.equals(that.image) : that.image != null)
-        return false;
-      return options != null ? options.equals(that.options) : that.options == null;
-
-    }
-
-    @Override
-    public int hashCode() {
-      int result = image != null ? image.hashCode() : 0;
-      result = 31 * result + (options != null ? options.hashCode() : 0);
-      return result;
     }
   }
 
@@ -590,58 +482,6 @@ public class MesosAgentSpecs extends AbstractDescribableImpl<MesosAgentSpecs> {
     public String getCustomDockerCommandShell() {
       return customDockerCommandShell;
     }
-
-    @Override
-    public boolean equals(Object o) {
-      if (this == o)
-        return true;
-      if (o == null || getClass() != o.getClass())
-        return false;
-
-      ContainerInfo that = (ContainerInfo) o;
-
-      if (useCustomDockerCommandShell != that.useCustomDockerCommandShell)
-        return false;
-      if (type != null ? !type.equals(that.type) : that.type != null)
-        return false;
-      if (dockerImage != null ? !dockerImage.equals(that.dockerImage) : that.dockerImage != null)
-        return false;
-      if (volumes != null ? !volumes.equals(that.volumes) : that.volumes != null)
-        return false;
-      if (parameters != null ? !parameters.equals(that.parameters) : that.parameters != null)
-        return false;
-      if (networking != null ? !networking.equals(that.networking) : that.networking != null)
-        return false;
-      if (portMappings != null ? !portMappings.equals(that.portMappings) : that.portMappings != null)
-        return false;
-      if (networkInfos != null ? !networkInfos.equals(that.networkInfos) : that.networkInfos != null)
-        return false;
-      if (customDockerCommandShell != null ? !customDockerCommandShell.equals(that.customDockerCommandShell)
-          : that.customDockerCommandShell != null)
-        return false;
-      if (dockerPrivilegedMode != that.dockerPrivilegedMode)
-        return false;
-      if (dockerForcePullImage != that.dockerForcePullImage)
-        return false;
-      return dockerImageCustomizable == that.dockerImageCustomizable;
-    }
-
-    @Override
-    public int hashCode() {
-      int result = type != null ? type.hashCode() : 0;
-      result = 31 * result + (dockerImage != null ? dockerImage.hashCode() : 0);
-      result = 31 * result + (volumes != null ? volumes.hashCode() : 0);
-      result = 31 * result + (parameters != null ? parameters.hashCode() : 0);
-      result = 31 * result + (networking != null ? networking.hashCode() : 0);
-      result = 31 * result + (networkInfos != null ? networkInfos.hashCode() : 0);
-      result = 31 * result + (portMappings != null ? portMappings.hashCode() : 0);
-      result = 31 * result + (useCustomDockerCommandShell ? 1 : 0);
-      result = 31 * result + (customDockerCommandShell != null ? customDockerCommandShell.hashCode() : 0);
-      result = 31 * result + (dockerPrivilegedMode ? 1 : 0);
-      result = 31 * result + (dockerForcePullImage ? 1 : 0);
-      result = 31 * result + (dockerImageCustomizable ? 1 : 0);
-      return result;
-    }
   }
 
   public static class Parameter extends AbstractDescribableImpl<Parameter> {
@@ -667,28 +507,6 @@ public class MesosAgentSpecs extends AbstractDescribableImpl<MesosAgentSpecs> {
 
     public String getValue() {
       return value;
-    }
-
-    @Override
-    public boolean equals(Object o) {
-      if (this == o)
-        return true;
-      if (o == null || getClass() != o.getClass())
-        return false;
-
-      Parameter parameter = (Parameter) o;
-
-      if (key != null ? !key.equals(parameter.key) : parameter.key != null)
-        return false;
-      return value != null ? value.equals(parameter.value) : parameter.value == null;
-
-    }
-
-    @Override
-    public int hashCode() {
-      int result = key != null ? key.hashCode() : 0;
-      result = 31 * result + (value != null ? value.hashCode() : 0);
-      return result;
     }
   }
 
@@ -728,31 +546,6 @@ public class MesosAgentSpecs extends AbstractDescribableImpl<MesosAgentSpecs> {
     public String toString() {
       return (hostPort == null ? 0 : hostPort) + ":" + containerPort;
     }
-
-    @Override
-    public boolean equals(Object o) {
-      if (this == o)
-        return true;
-      if (o == null || getClass() != o.getClass())
-        return false;
-
-      PortMapping that = (PortMapping) o;
-
-      if (containerPort != null ? !containerPort.equals(that.containerPort) : that.containerPort != null)
-        return false;
-      if (hostPort != null ? !hostPort.equals(that.hostPort) : that.hostPort != null)
-        return false;
-      return protocol != null ? protocol.equals(that.protocol) : that.protocol == null;
-
-    }
-
-    @Override
-    public int hashCode() {
-      int result = containerPort != null ? containerPort.hashCode() : 0;
-      result = 31 * result + (hostPort != null ? hostPort.hashCode() : 0);
-      result = 31 * result + (protocol != null ? protocol.hashCode() : 0);
-      return result;
-    }
   }
 
   public static class Volume extends AbstractDescribableImpl<Volume> {
@@ -784,31 +577,6 @@ public class MesosAgentSpecs extends AbstractDescribableImpl<MesosAgentSpecs> {
 
     public boolean isReadOnly() {
       return readOnly;
-    }
-
-    @Override
-    public boolean equals(Object o) {
-      if (this == o)
-        return true;
-      if (o == null || getClass() != o.getClass())
-        return false;
-
-      Volume volume = (Volume) o;
-
-      if (readOnly != volume.readOnly)
-        return false;
-      if (containerPath != null ? !containerPath.equals(volume.containerPath) : volume.containerPath != null)
-        return false;
-      return hostPath != null ? hostPath.equals(volume.hostPath) : volume.hostPath == null;
-
-    }
-
-    @Override
-    public int hashCode() {
-      int result = containerPath != null ? containerPath.hashCode() : 0;
-      result = 31 * result + (hostPath != null ? hostPath.hashCode() : 0);
-      result = 31 * result + (readOnly ? 1 : 0);
-      return result;
     }
   }
 
@@ -842,31 +610,6 @@ public class MesosAgentSpecs extends AbstractDescribableImpl<MesosAgentSpecs> {
     public boolean isExtract() {
       return extract;
     }
-
-    @Override
-    public boolean equals(Object o) {
-      if (this == o)
-        return true;
-      if (o == null || getClass() != o.getClass())
-        return false;
-
-      URI uri = (URI) o;
-
-      if (executable != uri.executable)
-        return false;
-      if (extract != uri.extract)
-        return false;
-      return value != null ? value.equals(uri.value) : uri.value == null;
-
-    }
-
-    @Override
-    public int hashCode() {
-      int result = value != null ? value.hashCode() : 0;
-      result = 31 * result + (executable ? 1 : 0);
-      result = 31 * result + (extract ? 1 : 0);
-      return result;
-    }
   }
 
   public static class NetworkInfo extends AbstractDescribableImpl<NetworkInfo> {
@@ -890,25 +633,6 @@ public class MesosAgentSpecs extends AbstractDescribableImpl<MesosAgentSpecs> {
 
     public boolean hasNetworkName() {
       return networkName != null && !networkName.isEmpty();
-    }
-
-    @Override
-    public boolean equals(Object o) {
-      if (this == o)
-        return true;
-      if (o == null || getClass() != o.getClass())
-        return false;
-
-      NetworkInfo networkInfo = (NetworkInfo) o;
-
-      return networkName != null ? networkName.equals(networkInfo.networkName) : networkInfo.networkName == null;
-
-    }
-
-    @Override
-    public int hashCode() {
-      int result = networkName != null ? networkName.hashCode() : 0;
-      return result;
     }
   }
 

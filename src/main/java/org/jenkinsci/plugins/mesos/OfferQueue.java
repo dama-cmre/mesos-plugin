@@ -3,8 +3,6 @@ package org.jenkinsci.plugins.mesos;
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.mesos.Protos;
 
-import jenkins.metrics.api.Metrics;
-
 import java.time.Duration;
 import java.util.Collection;
 import java.util.LinkedList;
@@ -75,35 +73,22 @@ public class OfferQueue {
      * @return true if the Offer was successfully put in the queue, false otherwise
      */
     public boolean offer(Protos.Offer offer) {
-        boolean success = queue.offer(offer);
-
-        if (success) {
-            Metrics.metricRegistry().meter("mesos.offer.queue.added").mark();
-        } else {
-            Metrics.metricRegistry().meter("mesos.offer.queue.dropped").mark();
-        }
-
-        return success;
+        return queue.offer(offer);
     }
 
     /**
      * This method removes an offer from the queue based on its OfferID.
      */
     public void remove(Protos.OfferID offerID) {
-        Collection<Protos.Offer> offers = queue.parallelStream()
-                .filter(offer -> offer.getId().equals(offerID))
+        Collection<Protos.Offer> offers = queue.parallelStream().filter(offer -> offer.getId().equals(offerID))
                 .collect(Collectors.toList());
 
         boolean removed = queue.removeAll(offers);
         if (!removed) {
-            logger.warning(
-                    String.format(
-                            "Attempted to remove offer: '%s' but it was not present in the queue.",
-                            offerID.getValue()));
+            logger.warning(String.format("Attempted to remove offer: '%s' but it was not present in the queue.",
+                    offerID.getValue()));
         } else {
             logger.info(String.format("Removed offer: %s", offerID.getValue()));
-
-            Metrics.metricRegistry().meter("mesos.offer.queue.removed").mark();
         }
     }
 

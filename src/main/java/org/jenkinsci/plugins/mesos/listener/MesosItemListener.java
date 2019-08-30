@@ -6,6 +6,8 @@ import hudson.model.Hudson;
 import hudson.model.Item;
 import hudson.model.Label;
 import hudson.model.listeners.ItemListener;
+import jenkins.model.Jenkins;
+
 import org.jenkinsci.plugins.mesos.MesosCloud;
 import org.jenkinsci.plugins.mesos.MesosAgentSpecs;
 
@@ -77,7 +79,7 @@ public class MesosItemListener extends ItemListener {
             if (list != null && list.size() > 0) {
                 for (MesosAgentSpecs slaveInfo : list) {
                     if (slaveInfo.isDefaultSlave()) {
-                        label = Hudson.getInstance().getLabel(slaveInfo.getLabelString());
+                        label = Jenkins.get().getLabel(slaveInfo.getLabelString());
                         break;
                     }
                 }

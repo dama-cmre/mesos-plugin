@@ -17,15 +17,12 @@ package org.jenkinsci.plugins.mesos;
 import hudson.model.TaskListener;
 import hudson.slaves.JNLPLauncher;
 import hudson.slaves.SlaveComputer;
-import jenkins.metrics.api.Metrics;
 
 import org.jenkinsci.plugins.mesos.Mesos.JenkinsSlave;
 
 import java.io.PrintStream;
 import java.util.concurrent.CountDownLatch;
 import java.util.logging.Logger;
-
-import com.codahale.metrics.Timer;
 
 public class MesosComputerLauncher extends JNLPLauncher {
 
@@ -87,7 +84,6 @@ public class MesosComputerLauncher extends JNLPLauncher {
     logger.println("Starting mesos slave " + name);
     LOGGER.info("Sending a request to start jenkins slave " + name);
 
-    final Timer.Context context = Metrics.metricRegistry().timer("mesos.computer.launcher.launch").time();
     mesos.startJenkinsSlave(request, new Mesos.SlaveResult() {
       public void running(JenkinsSlave slave) {
         state = State.RUNNING;
@@ -121,8 +117,6 @@ public class MesosComputerLauncher extends JNLPLauncher {
       // we were waiting for resources to be available
       node.setPendingDelete(false);
       waitForSlaveConnection(computer, logger);
-      computer.getNode().getProvisioningContext().stop();
-      context.stop();
       logger.println("Successfully launched slave " + name);
     }
 

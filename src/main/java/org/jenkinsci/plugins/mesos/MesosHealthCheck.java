@@ -10,7 +10,8 @@ public class MesosHealthCheck extends HealthCheck {
         MesosAdministrativeMonitor administrativeMonitor = getAdministrativeMonitor();
         if (administrativeMonitor != null) {
             if (administrativeMonitor.isActivated()) {
-                return Result.unhealthy("Some mesos slaves cannot be provisioned : " + Joiner.on(',').join(administrativeMonitor.getLabels()));
+                return Result.unhealthy("Some mesos slaves cannot be provisioned : "
+                        + Joiner.on(',').join(administrativeMonitor.getLabels()));
             } else {
                 return Result.healthy();
             }
@@ -19,10 +20,11 @@ public class MesosHealthCheck extends HealthCheck {
     }
 
     private MesosAdministrativeMonitor getAdministrativeMonitor() {
-        Jenkins instance = Jenkins.getInstance();
+        Jenkins instance = Jenkins.get();
         if (instance == null) {
             return null;
         }
-        return (MesosAdministrativeMonitor) instance.getAdministrativeMonitor(MesosAdministrativeMonitor.class.getName());
+        return (MesosAdministrativeMonitor) instance
+                .getAdministrativeMonitor(MesosAdministrativeMonitor.class.getName());
     }
 }

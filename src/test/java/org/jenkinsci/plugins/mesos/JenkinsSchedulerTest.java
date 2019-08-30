@@ -5,7 +5,6 @@ import hudson.model.Descriptor;
 import hudson.model.Node;
 import hudson.model.Queue;
 import hudson.model.Queue.Item;
-import jenkins.metrics.api.Metrics;
 import jenkins.model.Jenkins;
 import org.apache.mesos.Protos;
 import org.apache.mesos.SchedulerDriver;
@@ -57,10 +56,9 @@ public class JenkinsSchedulerTest {
 
         // Simulate basic Jenkins env
         jenkins = Mockito.mock(Jenkins.class);
-        when(jenkins.getPlugin(Metrics.class)).thenReturn(new Metrics());
         when(jenkins.isUseSecurity()).thenReturn(false);
         PowerMockito.mockStatic(Jenkins.class);
-        Mockito.when(Jenkins.getInstance()).thenReturn(jenkins);
+        Mockito.when(Jenkins.get()).thenReturn(jenkins);
 
         jenkinsScheduler = new JenkinsScheduler("jenkinsMaster", mesosCloud, false);
 
