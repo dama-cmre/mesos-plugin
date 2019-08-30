@@ -7,7 +7,7 @@ import hudson.model.Item;
 import hudson.model.Label;
 import hudson.model.listeners.ItemListener;
 import org.jenkinsci.plugins.mesos.MesosCloud;
-import org.jenkinsci.plugins.mesos.MesosSlaveInfo;
+import org.jenkinsci.plugins.mesos.MesosAgentSpecs;
 
 import java.lang.Exception;
 import java.lang.Override;
@@ -15,9 +15,8 @@ import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-
 @Extension
-public class MesosItemListener  extends ItemListener {
+public class MesosItemListener extends ItemListener {
     private static Logger LOGGER = Logger.getLogger(MesosItemListener.class.getName());
 
     /**
@@ -49,10 +48,12 @@ public class MesosItemListener  extends ItemListener {
             Label label = job.getAssignedLabel();
             try {
                 if (label == null) { // No label assigned, override now
-                    LOGGER.log(Level.FINE, "No label assigned to job - " + job.getDisplayName() + ". Assigning a label now...");
+                    LOGGER.log(Level.FINE,
+                            "No label assigned to job - " + job.getDisplayName() + ". Assigning a label now...");
                     label = getLabel();
                     if (label != null) {
-                        LOGGER.log(Level.INFO, "Assigned \"" + label.getName() + "\"  to job \"" + job.getDisplayName() + "\"");
+                        LOGGER.log(Level.INFO,
+                                "Assigned \"" + label.getName() + "\"  to job \"" + job.getDisplayName() + "\"");
                         job.setAssignedLabel(label);
                     }
                 }
@@ -70,11 +71,11 @@ public class MesosItemListener  extends ItemListener {
         Label label = null;
         // get mesos cloud
         MesosCloud cloud = MesosCloud.get();
-        if(cloud != null) {
+        if (cloud != null) {
             // get all label associate  with cloud
-            List<MesosSlaveInfo> list = cloud.getSlaveInfos();
-            if(list != null && list.size() > 0) {
-                for (MesosSlaveInfo slaveInfo: list) {
+            List<MesosAgentSpecs> list = cloud.getSlaveInfos();
+            if (list != null && list.size() > 0) {
+                for (MesosAgentSpecs slaveInfo : list) {
                     if (slaveInfo.isDefaultSlave()) {
                         label = Hudson.getInstance().getLabel(slaveInfo.getLabelString());
                         break;

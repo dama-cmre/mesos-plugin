@@ -15,14 +15,11 @@
 package org.jenkinsci.plugins.mesos;
 
 import edu.umd.cs.findbugs.annotations.NonNull;
-import hudson.model.Slave;
 import hudson.remoting.VirtualChannel;
-import hudson.slaves.SlaveComputer;
+import hudson.slaves.AbstractCloudComputer;
 
 import java.io.IOException;
 import java.util.logging.Logger;
-
-import javax.servlet.ServletException;
 
 import jenkins.model.Jenkins;
 import jenkins.slaves.EncryptedSlaveAgentJnlpFile;
@@ -33,32 +30,32 @@ import org.kohsuke.stapler.StaplerRequest;
 import org.kohsuke.stapler.StaplerResponse;
 import org.kohsuke.stapler.WebMethod;
 
-public class MesosComputer extends SlaveComputer {
+public class MesosComputer extends AbstractCloudComputer<MesosJenkinsAgent> {
   private static final Logger LOGGER = Logger.getLogger(MesosComputer.class.getName());
 
-  public MesosComputer(Slave slave) {
+  public MesosComputer(MesosJenkinsAgent slave) {
     super(slave);
   }
 
   @Override
-  public MesosSlave getNode() {
-    return (MesosSlave) super.getNode();
+  public MesosJenkinsAgent getNode() {
+    return (MesosJenkinsAgent) super.getNode();
   }
 
   @Override
   public HttpResponse doDoDelete() throws IOException {
     checkPermission(DELETE);
-      MesosSlave node = getNode();
-      if (node != null) {
-          node.terminate();
-      }
+    MesosJenkinsAgent node = getNode();
+    if (node != null) {
+      node.terminate();
+    }
     return new HttpRedirect("..");
   }
 
   @Override
-  @WebMethod(name="slave-agent.jnlp")
+  @WebMethod(name = "slave-agent.jnlp")
   public HttpResponse doSlaveAgentJnlp(StaplerRequest req, StaplerResponse res) {
-	  return new EncryptedSlaveAgentJnlpFile(this, "mesos-slave-agent.jnlp.jelly", getName(), CONNECT);
+    return new EncryptedSlaveAgentJnlpFile(this, "mesos-slave-agent.jnlp.jelly", getName(), CONNECT);
   }
 
   /**
@@ -67,26 +64,27 @@ public class MesosComputer extends SlaveComputer {
    * @throws InterruptedException
    */
   public void deleteSlave() throws IOException, InterruptedException {
-      LOGGER.info("Terminating " + getName() + " slave");
-      MesosSlave slave = getNode();
+    LOGGER.info("Terminating " + getName() + " slave");
+    MesosJenkinsAgent slave = getNode();
 
-      // Slave already deleted
-      if (slave == null) return;
+    // Slave already deleted
+    if (slave == null)
+      return;
 
-      VirtualChannel channel = slave.getChannel();
-      if (channel != null) {
-          channel.close();
-      }
-      slave.terminate();
-      getJenkins().removeNode(slave);
+    VirtualChannel channel = slave.getChannel();
+    if (channel != null) {
+      channel.close();
+    }
+    slave.terminate();
+    getJenkins().removeNode(slave);
   }
 
-    @NonNull
-    private static Jenkins getJenkins() {
-        Jenkins jenkins = Jenkins.getInstance();
-        if (jenkins == null) {
-            throw new IllegalStateException("Jenkins is null");
-        }
-        return jenkins;
+  @NonNull
+  private static Jenkins getJenkins() {
+    Jenkins jenkins = Jenkins.getInstance();
+    if (jenkins == null) {
+      throw new IllegalStateException("Jenkins is null");
     }
+    return jenkins;
+  }
 }

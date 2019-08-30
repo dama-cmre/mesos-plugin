@@ -45,10 +45,10 @@ public abstract class Mesos {
     final int mem;
     final double diskNeeded;
     final String role;
-    final MesosSlaveInfo slaveInfo;
+    final MesosAgentSpecs slaveInfo;
 
-    public SlaveRequest(JenkinsSlave slave, double cpus, int mem, String role,
-        MesosSlaveInfo slaveInfo, double diskNeeded) {
+    public SlaveRequest(JenkinsSlave slave, double cpus, int mem, String role, MesosAgentSpecs slaveInfo,
+        double diskNeeded) {
       this.slave = slave;
       this.cpus = cpus;
       this.mem = mem;
@@ -57,7 +57,6 @@ public abstract class Mesos {
       this.diskNeeded = diskNeeded;
     }
   }
-
 
   interface SlaveResult {
     void running(JenkinsSlave slave);
@@ -68,7 +67,9 @@ public abstract class Mesos {
   }
 
   abstract public void startScheduler(String jenkinsMaster, MesosCloud mesosCloud);
+
   abstract public void updateScheduler(String jenkinsMaster, MesosCloud mesosCloud);
+
   abstract public boolean isSchedulerRunning();
 
   /**
@@ -78,13 +79,16 @@ public abstract class Mesos {
   public boolean stopScheduler() {
     return stopScheduler(false);
   }
+
   /**
    * Stops the scheduler.
    * @param force {@code false} to stop the scheduler gracefully, {@code true} to force stop
    * @return {@code true} if the scheduler is stopped after the call, {@code false} otherwise.
    */
   abstract public boolean stopScheduler(boolean force);
+
   abstract public Scheduler getScheduler();
+
   /**
    * Starts a jenkins slave asynchronously in the mesos cluster.
    *
@@ -94,7 +98,6 @@ public abstract class Mesos {
    *          this callback will be called when the slave starts.
    */
   abstract public void startJenkinsSlave(SlaveRequest request, SlaveResult result);
-
 
   /**
    * Stop a jenkins slave asynchronously in the mesos cluster.
@@ -120,7 +123,6 @@ public abstract class Mesos {
     return clouds.values();
   }
 
-
   /**
    * When Jenkins configuration is saved, teardown any active scheduler whose cloud has been removed.
    */
@@ -132,20 +134,20 @@ public abstract class Mesos {
       if (o instanceof Jenkins) {
         Jenkins j = (Jenkins) o;
         Set<String> jenkinsClouds = new HashSet<String>();
-        for (Cloud c : j.clouds){
+        for (Cloud c : j.clouds) {
           if (c instanceof MesosCloud) {
             jenkinsClouds.add(((MesosCloud) c).getCloudID());
           }
         }
         for (Iterator<Map.Entry<String, Mesos>> it = clouds.entrySet().iterator(); it.hasNext();) {
           Map.Entry<String, Mesos> entry = it.next();
-          if(!jenkinsClouds.contains(entry.getKey())) {
+          if (!jenkinsClouds.contains(entry.getKey())) {
             LOGGER.info("Removing active scheduler because cloud was removed");
             entry.getValue().stopScheduler(true);
             it.remove();
           }
-          }
-          }
+        }
       }
     }
   }
+}

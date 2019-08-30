@@ -31,12 +31,14 @@ public class MesosComputerLauncher extends JNLPLauncher {
 
   private final MesosCloud cloud;
 
-  enum State { INIT, RUNNING, FAILURE }
+  enum State {
+    INIT, RUNNING, FAILURE
+  }
 
   private static final Logger LOGGER = Logger.getLogger(MesosComputerLauncher.class.getName());
 
   public MesosComputerLauncher(MesosCloud cloud, String _name) {
-    super();
+    super(false);
     LOGGER.finer("Constructing MesosComputerLauncher");
     this.cloud = cloud;
     this.state = State.INIT;
@@ -52,7 +54,7 @@ public class MesosComputerLauncher extends JNLPLauncher {
    *      hudson.model.TaskListener)
    */
   @Override
-  public void launch(SlaveComputer _computer, TaskListener listener)  {
+  public void launch(SlaveComputer _computer, TaskListener listener) {
     LOGGER.fine("Launching slave computer " + name);
 
     MesosComputer computer = (MesosComputer) _computer;
@@ -65,17 +67,7 @@ public class MesosComputerLauncher extends JNLPLauncher {
     // This might happen if the computer was offline when Jenkins was shutdown.
     // Since Jenkins persists its state, it tries to launch offline slaves when
     // it restarts.
-    MesosSlave node = computer.getNode();
-    if (!mesos.isSchedulerRunning()) {
-      Metrics.metricRegistry().counter("mesos.computer.launcher.launch.fail").inc();
-
-      LOGGER.warning("Not launching " + name +
-                     " because the Mesos Jenkins scheduler is not running");
-      if (node != null) {
-        node.terminate();
-      }
-      return;
-    }
+    MesosJenkinsAgent node = computer.getNode();
     if (node == null) {
       return;
     }
@@ -86,8 +78,8 @@ public class MesosComputerLauncher extends JNLPLauncher {
     double diskNeeded = node.getDiskNeeded();
     String role = cloud.getRole();
 
-    Mesos.SlaveRequest request = new Mesos.SlaveRequest(new JenkinsSlave(name),
-            cpus, mem, role, node.getSlaveInfo(), diskNeeded);
+    Mesos.SlaveRequest request = new Mesos.SlaveRequest(new JenkinsSlave(name), cpus, mem, role, node.getSlaveInfo(),
+        diskNeeded);
 
     // Launch the jenkins slave.
     final CountDownLatch latch = new CountDownLatch(1);
@@ -142,7 +134,9 @@ public class MesosComputerLauncher extends JNLPLauncher {
       try {
         logger.println("Waiting for slave computer connection " + name);
         Thread.sleep(5000);
-      } catch (InterruptedException ignored) { return; }
+      } catch (InterruptedException ignored) {
+        return;
+      }
     }
     if (computer.isOnline()) {
       logger.println("Slave computer connected " + name);

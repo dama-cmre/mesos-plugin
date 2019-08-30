@@ -30,7 +30,7 @@
       <jenkinsURL></jenkinsURL>
       <declineOfferDuration>600000</declineOfferDuration>
       <slaveInfos>
-        <org.jenkinsci.plugins.mesos.MesosSlaveInfo>
+        <org.jenkinsci.plugins.mesos.MesosAgentSpecs>
           <slaveCpus>0.1</slaveCpus>
           <diskNeeded>0.0</diskNeeded>
           <slaveMem>512</slaveMem>
@@ -66,7 +66,7 @@
           <mode>NORMAL</mode>
           <nodeProperties/>
           <labelString>mesos</labelString>
-        </org.jenkinsci.plugins.mesos.MesosSlaveInfo>
+        </org.jenkinsci.plugins.mesos.MesosAgentSpecs>
       </slaveInfos>
     </org.jenkinsci.plugins.mesos.MesosCloud>
   </clouds>

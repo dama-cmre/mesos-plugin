@@ -62,10 +62,8 @@ public class JenkinsScheduler implements Scheduler {
     // overhead.
     private static final double JVM_MEM_OVERHEAD_FACTOR = 0.1;
 
-    private static final String SLAVE_COMMAND_FORMAT =
-        "java -DHUDSON_HOME=jenkins -server -Xmx%dm %s -jar ${MESOS_SANDBOX-.}/agent.jar %s %s -jnlpUrl %s";
-    private static final String WIN_AGENT_COMMAND_FORMAT = 
-        "%%JAVA_HOME%%/bin/java -DHUDSON_HOME=jenkins -server -Xmx%dm %s -jar %%MESOS_SANDBOX%%/agent.jar %s %s -jnlpUrl %s";
+    private static final String SLAVE_COMMAND_FORMAT = "java -DHUDSON_HOME=jenkins -server -Xmx%dm %s -jar ${MESOS_SANDBOX-.}/agent.jar %s %s -jnlpUrl %s";
+    private static final String WIN_AGENT_COMMAND_FORMAT = "%%JAVA_HOME%%/bin/java -DHUDSON_HOME=jenkins -server -Xmx%dm %s -jar %%MESOS_SANDBOX%%/agent.jar %s %s -jnlpUrl %s";
     private static final String JNLP_SECRET_FORMAT = "-secret %s";
     public static final String PORT_RESOURCE_NAME = "ports";
     public static final String MESOS_DEFAULT_ROLE = "*";
@@ -577,7 +575,7 @@ public class JenkinsScheduler implements Scheduler {
         if (mem < 0)
             LOGGER.fine("No mem resource present");
 
-        MesosSlaveInfo.ContainerInfo containerInfo = request.request.slaveInfo.getContainerInfo();
+        MesosAgentSpecs.ContainerInfo containerInfo = request.request.slaveInfo.getContainerInfo();
 
         boolean hasPortMappings = containerInfo != null ? containerInfo.hasPortMappings() : false;
 
@@ -739,9 +737,9 @@ public class JenkinsScheduler implements Scheduler {
             }
 
             MesosComputer mesosComputer = (MesosComputer) computer;
-            MesosSlave mesosSlave = mesosComputer.getNode();
+            MesosJenkinsAgent MesosJenkinsAgent = mesosComputer.getNode();
 
-            if (taskId.getValue().equals(computer.getName()) && mesosSlave.isPendingDelete()) {
+            if (taskId.getValue().equals(computer.getName()) && MesosJenkinsAgent.isPendingDelete()) {
                 LOGGER.info(
                         "This mesos task " + taskId.getValue() + " is pending deletion. Not launching another task");
                 declineShort(offer);
@@ -779,7 +777,7 @@ public class JenkinsScheduler implements Scheduler {
     private void detectAndAddAdditionalURIs(Request request, CommandInfo.Builder commandBuilder) {
 
         if (request.request.slaveInfo.getAdditionalURIs() != null) {
-            for (MesosSlaveInfo.URI uri : request.request.slaveInfo.getAdditionalURIs()) {
+            for (MesosAgentSpecs.URI uri : request.request.slaveInfo.getAdditionalURIs()) {
                 commandBuilder.addUris(CommandInfo.URI.newBuilder().setValue(uri.getValue())
                         .setExecutable(uri.isExecutable()).setExtract(uri.isExtract()));
             }
@@ -819,7 +817,7 @@ public class JenkinsScheduler implements Scheduler {
     }
 
     private void getContainerInfoBuilder(Offer offer, Request request, String slaveName, TaskInfo.Builder taskBuilder) {
-        MesosSlaveInfo.ContainerInfo containerInfo = request.request.slaveInfo.getContainerInfo();
+        MesosAgentSpecs.ContainerInfo containerInfo = request.request.slaveInfo.getContainerInfo();
         ContainerInfo.Type containerType = ContainerInfo.Type.valueOf(containerInfo.getType());
 
         ContainerInfo.Builder containerInfoBuilder = ContainerInfo.newBuilder() //
@@ -833,7 +831,7 @@ public class JenkinsScheduler implements Scheduler {
                     .setForcePullImage(containerInfo.getDockerForcePullImage());
 
             if (containerInfo.getParameters() != null) {
-                for (MesosSlaveInfo.Parameter parameter : containerInfo.getParameters()) {
+                for (MesosAgentSpecs.Parameter parameter : containerInfo.getParameters()) {
                     LOGGER.info("Adding Docker parameter '" + parameter.getKey() + ":" + parameter.getValue() + "'");
                     dockerInfoBuilder.addParameters(
                             Parameter.newBuilder().setKey(parameter.getKey()).setValue(parameter.getValue()).build());
@@ -849,14 +847,14 @@ public class JenkinsScheduler implements Scheduler {
             }
 
             if (request.request.slaveInfo.getContainerInfo().hasPortMappings()) {
-                List<MesosSlaveInfo.PortMapping> portMappings = request.request.slaveInfo.getContainerInfo()
+                List<MesosAgentSpecs.PortMapping> portMappings = request.request.slaveInfo.getContainerInfo()
                         .getPortMappings();
                 Set<Long> portsToUse = findPortsToUse(offer, portMappings.size());
                 String roleToUse = findRoleForPorts(offer);
                 Iterator<Long> iterator = portsToUse.iterator();
                 Value.Ranges.Builder portRangesBuilder = Value.Ranges.newBuilder();
 
-                for (MesosSlaveInfo.PortMapping portMapping : portMappings) {
+                for (MesosAgentSpecs.PortMapping portMapping : portMappings) {
                     PortMapping.Builder portMappingBuilder = PortMapping.newBuilder() //
                             .setContainerPort(portMapping.getContainerPort()) //
                             .setProtocol(portMapping.getProtocol());
@@ -885,7 +883,7 @@ public class JenkinsScheduler implements Scheduler {
         }
 
         if (containerInfo.getVolumes() != null) {
-            for (MesosSlaveInfo.Volume volume : containerInfo.getVolumes()) {
+            for (MesosAgentSpecs.Volume volume : containerInfo.getVolumes()) {
                 LOGGER.info("Adding volume '" + volume.getContainerPath() + "'");
                 Volume.Builder volumeBuilder = Volume.newBuilder().setContainerPath(volume.getContainerPath())
                         .setMode(volume.isReadOnly() ? Mode.RO : Mode.RW);
@@ -897,7 +895,7 @@ public class JenkinsScheduler implements Scheduler {
         }
 
         if (containerInfo.hasNetworkInfos()) {
-            for (MesosSlaveInfo.NetworkInfo networkInfo : containerInfo.getNetworkInfos()) {
+            for (MesosAgentSpecs.NetworkInfo networkInfo : containerInfo.getNetworkInfos()) {
 
                 NetworkInfo.Builder networkInfoBuilder = NetworkInfo.newBuilder();
 
@@ -921,25 +919,19 @@ public class JenkinsScheduler implements Scheduler {
         return commandBuilder;
     }
 
-    String generateJenkinsCommand2Run(int jvmMem,String jvmArgString,String jnlpArgString,String slaveName, boolean isWindows) {
+    String generateJenkinsCommand2Run(int jvmMem, String jvmArgString, String jnlpArgString, String slaveName,
+            boolean isWindows) {
 
-        return String.format(isWindows ? WIN_AGENT_COMMAND_FORMAT : SLAVE_COMMAND_FORMAT,
-                jvmMem,
-                jvmArgString,
-                jnlpArgString,
-                getJnlpSecret(slaveName),
-                getJnlpUrl(slaveName));
+        return String.format(isWindows ? WIN_AGENT_COMMAND_FORMAT : SLAVE_COMMAND_FORMAT, jvmMem, jvmArgString,
+                jnlpArgString, getJnlpSecret(slaveName), getJnlpUrl(slaveName));
     }
 
     private CommandInfo.Builder getBaseCommandBuilder(Request request) {
 
         CommandInfo.Builder commandBuilder = CommandInfo.newBuilder();
-        String jenkinsCommand2Run = generateJenkinsCommand2Run(
-                request.request.slaveInfo.getSlaveMem(),
-                request.request.slaveInfo.getJvmArgs(),
-                request.request.slaveInfo.getJnlpArgs(),
-                request.request.slave.name,
-                request.request.slaveInfo.isWindowsAgent());
+        String jenkinsCommand2Run = generateJenkinsCommand2Run(request.request.slaveInfo.getSlaveMem(),
+                request.request.slaveInfo.getJvmArgs(), request.request.slaveInfo.getJnlpArgs(),
+                request.request.slave.name, request.request.slaveInfo.isWindowsAgent());
 
         if (request.request.slaveInfo.getContainerInfo() != null
                 && request.request.slaveInfo.getContainerInfo().getUseCustomDockerCommandShell()) {
@@ -1131,7 +1123,7 @@ public class JenkinsScheduler implements Scheduler {
                         boolean activeTasks = (scheduler.getNumberOfActiveTasks() > 0);
                         List<Node> slaveNodes = getJenkins().getNodes();
                         for (Node node : slaveNodes) {
-                            if (node instanceof MesosSlave) {
+                            if (node instanceof MesosJenkinsAgent) {
                                 activeSlaves = true;
                                 break;
                             }

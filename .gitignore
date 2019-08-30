@@ -11,6 +11,8 @@ work/
 *.ipr
 *.iws
 
+.vscode
+
 # Exclude Vagrant generated files
 .vagrant/
 

@@ -32,9 +32,8 @@ import static org.mockito.Matchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.when;
 
-
 @RunWith(PowerMockRunner.class)
-@PrepareForTest( { Jenkins.class })
+@PrepareForTest({ Jenkins.class })
 public class JenkinsSchedulerTest {
     @Mock
     private MesosCloud mesosCloud;
@@ -43,14 +42,13 @@ public class JenkinsSchedulerTest {
 
     private Jenkins jenkins;
 
-    private static final int    TEST_JENKINS_SLAVE_MEM   = 512;
-    private static final String TEST_JENKINS_SLAVE_ARG   = "-Xms16m -XX:+UseConcMarkSweepGC -Djava.net.preferIPv4Stack=true";
-    private static final String TEST_JENKINS_JNLP_ARG    = "";
-    private static final String TEST_JENKINS_SLAVE_NAME  = "testSlave1";
-    private static final String TEST_MESOS_ROLE_NAME     = "test_role";
-    private static final Protos.FrameworkID TEST_FRAMEWORK_ID =
-            Protos.FrameworkID.newBuilder().setValue("test-framework-id").build();
-
+    private static final int TEST_JENKINS_SLAVE_MEM = 512;
+    private static final String TEST_JENKINS_SLAVE_ARG = "-Xms16m -XX:+UseConcMarkSweepGC -Djava.net.preferIPv4Stack=true";
+    private static final String TEST_JENKINS_JNLP_ARG = "";
+    private static final String TEST_JENKINS_SLAVE_NAME = "testSlave1";
+    private static final String TEST_MESOS_ROLE_NAME = "test_role";
+    private static final Protos.FrameworkID TEST_FRAMEWORK_ID = Protos.FrameworkID.newBuilder()
+            .setValue("test-framework-id").build();
 
     @Before
     public void setUp() {
@@ -114,34 +112,19 @@ public class JenkinsSchedulerTest {
 
     @Test
     public void testSingleFirstRangeLongRangeAfterNoInfiniteLoop() {
-        Protos.Value.Range range = Protos.Value.Range.newBuilder()
-                .setBegin(31000)
-                .setEnd(31000)
-                .build();
+        Protos.Value.Range range = Protos.Value.Range.newBuilder().setBegin(31000).setEnd(31000).build();
 
-        Protos.Value.Range range2 = Protos.Value.Range.newBuilder()
-                .setBegin(31005)
-                .setEnd(32000)
-                .build();
+        Protos.Value.Range range2 = Protos.Value.Range.newBuilder().setBegin(31005).setEnd(32000).build();
 
-        Protos.Value.Ranges ranges = Protos.Value.Ranges.newBuilder()
-                .addRange(range)
-                .addRange(range2)
-                .build();
+        Protos.Value.Ranges ranges = Protos.Value.Ranges.newBuilder().addRange(range).addRange(range2).build();
 
-        Protos.Resource resource = Protos.Resource.newBuilder()
-                .setName("ports")
-                .setRanges(ranges)
-                .setType(Protos.Value.Type.RANGES)
-                .build();
+        Protos.Resource resource = Protos.Resource.newBuilder().setName("ports").setRanges(ranges)
+                .setType(Protos.Value.Type.RANGES).build();
 
-        final Protos.Offer protoOffer = Protos.Offer.newBuilder()
-                .addResources(resource)
+        final Protos.Offer protoOffer = Protos.Offer.newBuilder().addResources(resource)
                 .setId(Protos.OfferID.newBuilder().setValue("value").build())
                 .setFrameworkId(Protos.FrameworkID.newBuilder().setValue("value").build())
-                .setSlaveId(Protos.SlaveID.newBuilder().setValue("value").build())
-                .setHostname("hostname")
-                .build();
+                .setSlaveId(Protos.SlaveID.newBuilder().setValue("value").build()).setHostname("hostname").build();
 
         final ExecutorService executorService = Executors.newFixedThreadPool(1);
         executorService.execute(new Runnable() {
@@ -182,7 +165,8 @@ public class JenkinsSchedulerTest {
         Mockito.when(mesosCloud.getDeclineOfferDurationDouble()).thenReturn((double) 120000);
         jenkinsScheduler.resourceOffers(driver, offers);
         Mockito.verify(driver, Mockito.never()).declineOffer(offer.getId());
-        Mockito.verify(driver).declineOffer(offer.getId(), Protos.Filters.newBuilder().setRefuseSeconds(120000).build());
+        Mockito.verify(driver).declineOffer(offer.getId(),
+                Protos.Filters.newBuilder().setRefuseSeconds(120000).build());
     }
 
     @Test
@@ -198,8 +182,10 @@ public class JenkinsSchedulerTest {
         jenkinsScheduler.setDriver(driver);
         Mockito.when(mesosCloud.getDeclineOfferDurationDouble()).thenReturn((double) 120000);
         jenkinsScheduler.resourceOffers(driver, offers);
-        Mockito.verify(driver).declineOffer(offer.getId(), Protos.Filters.newBuilder().setRefuseSeconds(MesosCloud.SHORT_DECLINE_OFFER_DURATION_SEC).build());
-        Mockito.verify(driver, Mockito.never()).declineOffer(offer.getId(), Protos.Filters.newBuilder().setRefuseSeconds(120000).build());
+        Mockito.verify(driver).declineOffer(offer.getId(),
+                Protos.Filters.newBuilder().setRefuseSeconds(MesosCloud.SHORT_DECLINE_OFFER_DURATION_SEC).build());
+        Mockito.verify(driver, Mockito.never()).declineOffer(offer.getId(),
+                Protos.Filters.newBuilder().setRefuseSeconds(120000).build());
     }
 
     @Test
@@ -212,7 +198,7 @@ public class JenkinsSchedulerTest {
         Mockito.when(jenkins.getQueue()).thenReturn(queue);
 
         Item item = Mockito.mock(Item.class);
-        Item [] items = {item};
+        Item[] items = { item };
         Mockito.when(queue.getItems()).thenReturn(items);
         Mockito.when(mesosCloud.canProvision(null)).thenReturn(true);
 
@@ -220,8 +206,10 @@ public class JenkinsSchedulerTest {
         jenkinsScheduler.setDriver(driver);
         Mockito.when(mesosCloud.getDeclineOfferDurationDouble()).thenReturn((double) 120000);
         jenkinsScheduler.resourceOffers(driver, offers);
-        Mockito.verify(driver).declineOffer(offer.getId(), Protos.Filters.newBuilder().setRefuseSeconds(MesosCloud.SHORT_DECLINE_OFFER_DURATION_SEC).build());
-        Mockito.verify(driver, Mockito.never()).declineOffer(offer.getId(), Protos.Filters.newBuilder().setRefuseSeconds(120000).build());
+        Mockito.verify(driver).declineOffer(offer.getId(),
+                Protos.Filters.newBuilder().setRefuseSeconds(MesosCloud.SHORT_DECLINE_OFFER_DURATION_SEC).build());
+        Mockito.verify(driver, Mockito.never()).declineOffer(offer.getId(),
+                Protos.Filters.newBuilder().setRefuseSeconds(120000).build());
     }
 
     @Test
@@ -244,7 +232,7 @@ public class JenkinsSchedulerTest {
         Mockito.when(jenkins.getComputers()).thenReturn(new Computer[] { computer });
 
         Item item = Mockito.mock(Item.class);
-        Item [] items = {item};
+        Item[] items = { item };
         Mockito.when(queue.getItems()).thenReturn(items);
         Mockito.when(mesosCloud.canProvision(null)).thenReturn(true);
 
@@ -254,7 +242,8 @@ public class JenkinsSchedulerTest {
         jenkinsScheduler.resourceOffers(driver, offers);
 
         Mockito.verify(driver, never()).declineOffer(matchingOffer.getId());
-        Mockito.verify(driver).launchTasks(eq(matchingOffer.getId()), anyListOf(Protos.TaskInfo.class), eq(Protos.Filters.newBuilder().setRefuseSeconds(1).build()));
+        Mockito.verify(driver).launchTasks(eq(matchingOffer.getId()), anyListOf(Protos.TaskInfo.class),
+                eq(Protos.Filters.newBuilder().setRefuseSeconds(1).build()));
         assertEquals(0, jenkinsScheduler.getUnmatchedLabels().size());
     }
 
@@ -279,7 +268,7 @@ public class JenkinsSchedulerTest {
         Mockito.when(jenkins.getComputers()).thenReturn(new Computer[] { computer });
 
         Item item = Mockito.mock(Item.class);
-        Item [] items = { item };
+        Item[] items = { item };
         Mockito.when(queue.getItems()).thenReturn(items);
         Mockito.when(mesosCloud.canProvision(null)).thenReturn(true);
 
@@ -291,7 +280,8 @@ public class JenkinsSchedulerTest {
 
         // verify it
         Mockito.verify(driver, never()).declineOffer(matchingOffer.getId());
-        Mockito.verify(driver).launchTasks(eq(matchingOffer.getId()), anyListOf(Protos.TaskInfo.class), eq(Protos.Filters.newBuilder().setRefuseSeconds(1).build()));
+        Mockito.verify(driver).launchTasks(eq(matchingOffer.getId()), anyListOf(Protos.TaskInfo.class),
+                eq(Protos.Filters.newBuilder().setRefuseSeconds(1).build()));
         assertEquals(0, jenkinsScheduler.getUnmatchedLabels().size());
     }
 
@@ -313,7 +303,7 @@ public class JenkinsSchedulerTest {
         Mockito.when(jenkins.getQueue()).thenReturn(queue);
 
         Item item = Mockito.mock(Item.class);
-        Item [] items = { item };
+        Item[] items = { item };
         Mockito.when(queue.getItems()).thenReturn(items);
         Mockito.when(mesosCloud.canProvision(null)).thenReturn(true);
 
@@ -326,7 +316,8 @@ public class JenkinsSchedulerTest {
         // verify it
         // make sure it does not call "matches()" and gets declined because of a non-matching offer
         Mockito.verify(mesosCloud, never()).getRole();
-        Mockito.verify(driver).declineOffer(matchingOffer.getId(), Protos.Filters.newBuilder().setRefuseSeconds(MesosCloud.SHORT_DECLINE_OFFER_DURATION_SEC).build());
+        Mockito.verify(driver).declineOffer(matchingOffer.getId(),
+                Protos.Filters.newBuilder().setRefuseSeconds(MesosCloud.SHORT_DECLINE_OFFER_DURATION_SEC).build());
         assertEquals(1, jenkinsScheduler.getUnmatchedLabels().size());
     }
 
@@ -347,32 +338,26 @@ public class JenkinsSchedulerTest {
         Protos.CommandInfo.Builder commandInfoBuilder = jenkinsScheduler.getCommandInfoBuilder(request);
         Protos.CommandInfo commandInfo = commandInfoBuilder.build();
 
-        assertTrue("Default shell config (true) should be configured when no container specified", commandInfo.getShell());
+        assertTrue("Default shell config (true) should be configured when no container specified",
+                commandInfo.getShell());
 
-        String jenkinsCommand2Run = jenkinsScheduler.generateJenkinsCommand2Run(
-                TEST_JENKINS_SLAVE_MEM,
-                TEST_JENKINS_SLAVE_ARG,
-                TEST_JENKINS_JNLP_ARG,
-                TEST_JENKINS_SLAVE_NAME,
-                false);
+        String jenkinsCommand2Run = jenkinsScheduler.generateJenkinsCommand2Run(TEST_JENKINS_SLAVE_MEM,
+                TEST_JENKINS_SLAVE_ARG, TEST_JENKINS_JNLP_ARG, TEST_JENKINS_SLAVE_NAME, false);
         assertEquals("jenkins command to run should be specified as value", jenkinsCommand2Run, commandInfo.getValue());
         assertEquals("mesos command should have no args specified by default", 0, commandInfo.getArgumentsCount());
     }
 
     @Test
     public void testConstructMesosCommandInfoWithDefaultDockerShell() throws Exception {
-        JenkinsScheduler.Request request = mockMesosRequest(Boolean.TRUE,false,null);
+        JenkinsScheduler.Request request = mockMesosRequest(Boolean.TRUE, false, null);
 
         Protos.CommandInfo.Builder commandInfoBuilder = jenkinsScheduler.getCommandInfoBuilder(request);
         Protos.CommandInfo commandInfo = commandInfoBuilder.build();
 
-        assertTrue("Default shell config (true) should be configured when no container specified", commandInfo.getShell());
-        String jenkinsCommand2Run = jenkinsScheduler.generateJenkinsCommand2Run(
-                TEST_JENKINS_SLAVE_MEM,
-                TEST_JENKINS_SLAVE_ARG,
-                TEST_JENKINS_JNLP_ARG,
-                TEST_JENKINS_SLAVE_NAME,
-                false);
+        assertTrue("Default shell config (true) should be configured when no container specified",
+                commandInfo.getShell());
+        String jenkinsCommand2Run = jenkinsScheduler.generateJenkinsCommand2Run(TEST_JENKINS_SLAVE_MEM,
+                TEST_JENKINS_SLAVE_ARG, TEST_JENKINS_JNLP_ARG, TEST_JENKINS_SLAVE_NAME, false);
         assertEquals("jenkins command to run should be specified as value", jenkinsCommand2Run, commandInfo.getValue());
         assertEquals("mesos command should have no args specified by default", 0, commandInfo.getArgumentsCount());
     }
@@ -386,15 +371,12 @@ public class JenkinsSchedulerTest {
 
         assertFalse("shell should be configured as false when using a custom shell", commandInfo.getShell());
         assertEquals("Custom shell should be specified as value", "/bin/wrapdocker", commandInfo.getValue());
-        String jenkinsCommand2Run = jenkinsScheduler.generateJenkinsCommand2Run(
-                TEST_JENKINS_SLAVE_MEM,
-                TEST_JENKINS_SLAVE_ARG,
-                TEST_JENKINS_JNLP_ARG,
-                TEST_JENKINS_SLAVE_NAME,
-                false);
+        String jenkinsCommand2Run = jenkinsScheduler.generateJenkinsCommand2Run(TEST_JENKINS_SLAVE_MEM,
+                TEST_JENKINS_SLAVE_ARG, TEST_JENKINS_JNLP_ARG, TEST_JENKINS_SLAVE_NAME, false);
 
         assertEquals("args should now consist of the single original command ", 1, commandInfo.getArgumentsCount());
-        assertEquals("args should now consist of the original command ", jenkinsCommand2Run, commandInfo.getArguments(0));
+        assertEquals("args should now consist of the original command ", jenkinsCommand2Run,
+                commandInfo.getArguments(0));
     }
 
     @Test(expected = java.lang.IllegalArgumentException.class)
@@ -441,119 +423,78 @@ public class JenkinsSchedulerTest {
         Assert.assertEquals(TEST_FRAMEWORK_ID.getValue(), jenkinsScheduler.getFrameworkId());
     }
 
-    private Mesos.SlaveRequest mockSlaveRequest(
-        Boolean useDocker,
-        Boolean useCustomDockerCommandShell,
-        String customDockerCommandShell) throws Descriptor.FormException, IOException {
-        MesosSlaveInfo.ContainerInfo containerInfo = null;
+    private Mesos.SlaveRequest mockSlaveRequest(Boolean useDocker, Boolean useCustomDockerCommandShell,
+            String customDockerCommandShell) throws Descriptor.FormException, IOException {
+        MesosAgentSpecs.ContainerInfo containerInfo = null;
         if (useDocker) {
-            containerInfo = new MesosSlaveInfo.ContainerInfo(
-                    "docker",
-                    "test-docker-in-docker-image",
-                    Boolean.TRUE,
-                    Boolean.TRUE,
-                    Boolean.FALSE,
-                    useCustomDockerCommandShell,
-                    customDockerCommandShell,
-                    Collections.<MesosSlaveInfo.Volume>emptyList(),
-                    Collections.<MesosSlaveInfo.Parameter>emptyList(),
+            containerInfo = new MesosAgentSpecs.ContainerInfo("docker", "test-docker-in-docker-image", Boolean.TRUE,
+                    Boolean.TRUE, Boolean.FALSE, useCustomDockerCommandShell, customDockerCommandShell,
+                    Collections.<MesosAgentSpecs.Volume>emptyList(), Collections.<MesosAgentSpecs.Parameter>emptyList(),
                     Protos.ContainerInfo.DockerInfo.Network.HOST.name(),
-                    Collections.<MesosSlaveInfo.PortMapping>emptyList(),
-                    Collections.<MesosSlaveInfo.NetworkInfo>emptyList());
+                    Collections.<MesosAgentSpecs.PortMapping>emptyList(),
+                    Collections.<MesosAgentSpecs.NetworkInfo>emptyList());
         }
 
-        MesosSlaveInfo mesosSlaveInfo = new MesosSlaveInfo(
-                "testLabelString",  // labelString,
-                Node.Mode.NORMAL,
-                "0.2",              // slaveCpus,
-                "512",              // slaveMem,
-                "1",                // minExecutors,
-                "2",                // maxExecutors,
-                "0.2",              // executorCpus,
-                "500",               // diskNeeded
-                "512",              // executorMem,
-                "remoteFSRoot",     // remoteFSRoot,
-                "2",                // idleTerminationMinutes,
-                (String)null,       // slaveAttributes,
-                null,               // jvmArgs,
-                null,               // jnlpArgs,
-                null,               // defaultSlave,
-                null,               // windowsAgent,
-                containerInfo,      // containerInfo,
-                null,              // additionalURIs
-                null              // nodeProperties
-                );
-        return new Mesos.SlaveRequest(
-            new Mesos.JenkinsSlave(TEST_JENKINS_SLAVE_NAME), 0.2d, TEST_JENKINS_SLAVE_MEM, "jenkins", mesosSlaveInfo, 500);
+        MesosAgentSpecs MesosAgentSpecs = new MesosAgentSpecs("testLabelString", // labelString,
+                Node.Mode.NORMAL, "0.2", // slaveCpus,
+                "512", // slaveMem,
+                "1", // minExecutors,
+                "2", // maxExecutors,
+                "0.2", // executorCpus,
+                "500", // diskNeeded
+                "512", // executorMem,
+                "remoteFSRoot", // remoteFSRoot,
+                "2", // idleTerminationMinutes,
+                (String) null, // slaveAttributes,
+                null, // jvmArgs,
+                null, // jnlpArgs,
+                null, // defaultSlave,
+                null, // windowsAgent,
+                containerInfo, // containerInfo,
+                null // additionalURIs
+        );
+        return new Mesos.SlaveRequest(new Mesos.JenkinsSlave(TEST_JENKINS_SLAVE_NAME), 0.2d, TEST_JENKINS_SLAVE_MEM,
+                "jenkins", MesosAgentSpecs, 500);
     }
 
-    private JenkinsScheduler.Request mockMesosRequest(
-            Boolean useDocker,
-            Boolean useCustomDockerCommandShell,
+    private JenkinsScheduler.Request mockMesosRequest(Boolean useDocker, Boolean useCustomDockerCommandShell,
             String customDockerCommandShell) throws Descriptor.FormException, IOException {
         Mesos.SlaveResult slaveResult = Mockito.mock(Mesos.SlaveResult.class);
         return new JenkinsScheduler.Request(
-            mockSlaveRequest(useDocker, useCustomDockerCommandShell, customDockerCommandShell),
-            slaveResult);
+                mockSlaveRequest(useDocker, useCustomDockerCommandShell, customDockerCommandShell), slaveResult);
     }
 
     private Protos.Offer createOfferWithVariableRanges(long rangeBegin, long rangeEnd) {
-        Protos.Value.Range range = Protos.Value.Range.newBuilder()
-                .setBegin(rangeBegin)
-                .setEnd(rangeEnd)
-                .build();
+        Protos.Value.Range range = Protos.Value.Range.newBuilder().setBegin(rangeBegin).setEnd(rangeEnd).build();
 
-        Protos.Value.Ranges ranges = Protos.Value.Ranges.newBuilder()
-                .addRange(range)
-                .build();
+        Protos.Value.Ranges ranges = Protos.Value.Ranges.newBuilder().addRange(range).build();
 
-        Protos.Resource resource = Protos.Resource.newBuilder()
-                .setName("ports")
-                .setRanges(ranges)
-                .setType(Protos.Value.Type.RANGES)
-                .build();
+        Protos.Resource resource = Protos.Resource.newBuilder().setName("ports").setRanges(ranges)
+                .setType(Protos.Value.Type.RANGES).build();
 
-        return Protos.Offer.newBuilder()
-                .addResources(resource)
+        return Protos.Offer.newBuilder().addResources(resource)
                 .setId(Protos.OfferID.newBuilder().setValue("value").build())
                 .setFrameworkId(Protos.FrameworkID.newBuilder().setValue("value").build())
-                .setSlaveId(Protos.SlaveID.newBuilder().setValue("value").build())
-                .setHostname("hostname")
-                .build();
+                .setSlaveId(Protos.SlaveID.newBuilder().setValue("value").build()).setHostname("hostname").build();
     }
 
     private Protos.Offer createOfferWithRoleForPorts() {
-        Protos.Value.Range range = Protos.Value.Range.newBuilder()
-                .setBegin(31000)
-                .setEnd(32000)
-                .build();
+        Protos.Value.Range range = Protos.Value.Range.newBuilder().setBegin(31000).setEnd(32000).build();
 
-        Protos.Value.Ranges ranges = Protos.Value.Ranges.newBuilder()
-                .addRange(range)
-                .build();
+        Protos.Value.Ranges ranges = Protos.Value.Ranges.newBuilder().addRange(range).build();
 
-        Protos.Resource resource = Protos.Resource.newBuilder()
-                .setName("ports")
-                .setRanges(ranges)
-                .setRole(TEST_MESOS_ROLE_NAME)
-                .setType(Protos.Value.Type.RANGES)
-                .build();
+        Protos.Resource resource = Protos.Resource.newBuilder().setName("ports").setRanges(ranges)
+                .setRole(TEST_MESOS_ROLE_NAME).setType(Protos.Value.Type.RANGES).build();
 
-        return Protos.Offer.newBuilder()
-                .addResources(resource)
+        return Protos.Offer.newBuilder().addResources(resource)
                 .setId(Protos.OfferID.newBuilder().setValue("value").build())
                 .setFrameworkId(Protos.FrameworkID.newBuilder().setValue("value").build())
-                .setSlaveId(Protos.SlaveID.newBuilder().setValue("value").build())
-                .setHostname("hostname")
-                .build();
+                .setSlaveId(Protos.SlaveID.newBuilder().setValue("value").build()).setHostname("hostname").build();
     }
 
     private Protos.Resource createScalarResource(String name, double value) {
-        return Protos.Resource.newBuilder()
-                .setName(name)
-                .setScalar(Protos.Value.Scalar.newBuilder().setValue(value))
-                .setType(Protos.Value.Type.SCALAR)
-                .build();
+        return Protos.Resource.newBuilder().setName(name).setScalar(Protos.Value.Scalar.newBuilder().setValue(value))
+                .setType(Protos.Value.Type.SCALAR).build();
     }
 
     private Protos.Resource createCpuResource(double value) {
@@ -568,20 +509,18 @@ public class JenkinsSchedulerTest {
         return createOfferWithUnavailability(startDate, endDate, 2.0, 1000.0);
     }
 
-    private Protos.Offer createOfferWithUnavailability(Date startDate, Date endDate, double valueCpus, double valueMem) {
+    private Protos.Offer createOfferWithUnavailability(Date startDate, Date endDate, double valueCpus,
+            double valueMem) {
 
         long startNanos = TimeUnit.MILLISECONDS.toNanos(startDate.getTime());
         long durationNanos = TimeUnit.MILLISECONDS.toNanos(endDate.getTime() - startDate.getTime());
 
         Protos.Unavailability unavailability = Protos.Unavailability.newBuilder()
                 .setStart(Protos.TimeInfo.newBuilder().setNanoseconds(startNanos))
-                .setDuration(Protos.DurationInfo.newBuilder().setNanoseconds(durationNanos))
-                .build();
+                .setDuration(Protos.DurationInfo.newBuilder().setNanoseconds(durationNanos)).build();
 
         Protos.Offer offer = createOfferWithVariableRanges(31000, 32000);
-        return Protos.Offer.newBuilder(offer)
-                .addResources(createCpuResource(valueCpus))
-                .addResources(createMemResource(valueMem))
-                .setUnavailability(unavailability).build();
+        return Protos.Offer.newBuilder(offer).addResources(createCpuResource(valueCpus))
+                .addResources(createMemResource(valueMem)).setUnavailability(unavailability).build();
     }
 }

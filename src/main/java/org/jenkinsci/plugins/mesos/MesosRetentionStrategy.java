@@ -37,15 +37,10 @@ public class MesosRetentionStrategy extends RetentionStrategy<MesosComputer> {
   public final int idleTerminationMinutes;
   private transient ReentrantLock computerCheckLock = new ReentrantLock(false);
 
-  private static final Logger LOGGER = Logger
-      .getLogger(MesosRetentionStrategy.class.getName());
+  private static final Logger LOGGER = Logger.getLogger(MesosRetentionStrategy.class.getName());
 
   public MesosRetentionStrategy(int idleTerminationMinutes) {
     this.idleTerminationMinutes = idleTerminationMinutes;
-  }
-
-  private void readResolve() {
-    computerCheckLock = new ReentrantLock(false);
   }
 
   @Override
@@ -68,23 +63,22 @@ public class MesosRetentionStrategy extends RetentionStrategy<MesosComputer> {
    * @return The number of minutes to check again afterwards
    */
   private long checkInternal(MesosComputer c) {
-    MesosSlave node = c.getNode();
+    MesosJenkinsAgent node = c.getNode();
     if (node == null || node.isPendingDelete()) {
       return 1;
     }
 
     // If we just launched this computer, check back after 1 min.
     // NOTE: 'c.getConnectTime()' refers to when the Jenkins slave was launched.
-    if ((DateTimeUtils.currentTimeMillis() - c.getConnectTime()) <
-        MINUTES.toMillis(idleTerminationMinutes < 1 ? 1 : idleTerminationMinutes)) {
+    if ((DateTimeUtils.currentTimeMillis() - c.getConnectTime()) < MINUTES
+        .toMillis(idleTerminationMinutes < 1 ? 1 : idleTerminationMinutes)) {
       return 1;
     }
 
     // Terminate the computer if it is idle for longer than
     // 'idleTerminationMinutes'.
     if (isTerminable() && c.isIdle()) {
-      final long idleMilliseconds =
-          DateTimeUtils.currentTimeMillis() - c.getIdleStartMilliseconds();
+      final long idleMilliseconds = DateTimeUtils.currentTimeMillis() - c.getIdleStartMilliseconds();
 
       if (idleMilliseconds > MINUTES.toMillis(idleTerminationMinutes)) {
         LOGGER.info("Disconnecting idle computer " + c.getName());

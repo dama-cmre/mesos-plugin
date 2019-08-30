@@ -18,53 +18,51 @@ import hudson.Extension;
 import hudson.FilePath;
 import hudson.model.*;
 import hudson.model.Descriptor.FormException;
-import hudson.slaves.ComputerLauncher;
-import hudson.slaves.WorkspaceList;
+import hudson.slaves.*;
+import hudson.util.StreamTaskListener;
 import jenkins.model.Jenkins;
 
 import java.io.IOException;
+import java.nio.charset.Charset;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.List;
 
 import com.codahale.metrics.Timer;
 import org.apache.commons.lang.StringUtils;
 
-public class MesosSlave extends Slave {
+public class MesosJenkinsAgent extends AbstractCloudSlave {
 
   private static final long serialVersionUID = 1L;
 
   private final String cloudName;
   private transient MesosCloud cloud;
-  private final MesosSlaveInfo slaveInfo;
+  private final MesosAgentSpecs spec;
   private final int idleTerminationMinutes;
   private final double cpus;
   private final int mem;
   private final double diskNeeded;
   private transient final Timer.Context provisioningContext;
 
-
   private boolean pendingDelete;
 
-  private static final Logger LOGGER = Logger.getLogger(MesosSlave.class
-      .getName());
+  private static final Logger LOGGER = Logger.getLogger(MesosJenkinsAgent.class.getName());
 
-  public MesosSlave(MesosCloud cloud, String name, int numExecutors, MesosSlaveInfo slaveInfo, Timer.Context provisioningContext) throws IOException, FormException {
-    super(name,
-          slaveInfo.getLabelString(), // node description.
-          StringUtils.isBlank(slaveInfo.getRemoteFSRoot()) ? "jenkins" : slaveInfo.getRemoteFSRoot().trim(),   // remoteFS.
-          "" + numExecutors,
-          slaveInfo.getMode(),
-          slaveInfo.getLabelString(), // Label.
-          new MesosComputerLauncher(cloud, name),
-          new MesosRetentionStrategy(slaveInfo.getIdleTerminationMinutes()),
-          slaveInfo.getNodeProperties());
+  public MesosJenkinsAgent(MesosCloud cloud, String name, int numExecutors, MesosAgentSpecs spec,
+      Timer.Context provisioningContext, List<? extends NodeProperty<?>> nodeProperties)
+      throws IOException, FormException {
+    super(name, spec.getLabelString(),
+        StringUtils.isBlank(spec.getRemoteFSRoot()) ? "jenkins" : spec.getRemoteFSRoot().trim(), "" + numExecutors,
+        spec.getMode(), spec.getLabelString(), // Label.
+        new MesosComputerLauncher(cloud, name), new MesosRetentionStrategy(spec.getIdleTerminationMinutes()),
+        nodeProperties);
     this.cloud = cloud;
     this.cloudName = cloud.getDisplayName();
-    this.slaveInfo = slaveInfo;
-    this.idleTerminationMinutes = slaveInfo.getIdleTerminationMinutes();
-    this.cpus = slaveInfo.getSlaveCpus() + (numExecutors * slaveInfo.getExecutorCpus());
-    this.mem = slaveInfo.getSlaveMem() + (numExecutors * slaveInfo.getExecutorMem());
-    this.diskNeeded = slaveInfo.getdiskNeeded();
+    this.spec = spec;
+    this.idleTerminationMinutes = spec.getIdleTerminationMinutes();
+    this.cpus = spec.getSlaveCpus() + (numExecutors * spec.getExecutorCpus());
+    this.mem = spec.getSlaveMem() + (numExecutors * spec.getExecutorMem());
+    this.diskNeeded = spec.getdiskNeeded();
     this.provisioningContext = provisioningContext;
     LOGGER.fine("Constructing Mesos slave " + name + " from cloud " + cloud.getDescription());
   }
@@ -77,7 +75,7 @@ public class MesosSlave extends Slave {
   }
 
   private Jenkins getJenkins() {
-    Jenkins jenkins = Jenkins.getInstance();
+    Jenkins jenkins = Jenkins.get();
     if (jenkins == null) {
       throw new IllegalStateException("Jenkins is null");
     }
@@ -92,13 +90,12 @@ public class MesosSlave extends Slave {
     return mem;
   }
 
-
   public double getDiskNeeded() {
     return diskNeeded;
   }
 
-  public MesosSlaveInfo getSlaveInfo() {
-    return slaveInfo;
+  public MesosAgentSpecs getSlaveInfo() {
+    return spec;
   }
 
   public int getIdleTerminationMinutes() {
@@ -109,21 +106,36 @@ public class MesosSlave extends Slave {
     return provisioningContext;
   }
 
+  /**
+   * Releases and removes this agent.
+   */
   public void terminate() {
-    LOGGER.info("Terminating slave " + getNodeName());
+    final Computer computer = toComputer();
+    if (computer != null) {
+      computer.recordTermination();
+    }
     try {
-      // Remove the node from hudson.
-      Hudson.getInstance().removeNode(this);
-
-      ComputerLauncher launcher = getLauncher();
-
-      // If this is a mesos computer launcher, terminate the launcher.
-      if (launcher instanceof MesosComputerLauncher) {
-        ((MesosComputerLauncher) launcher).terminate();
+      // TODO: send the output to somewhere real
+      _terminate(new StreamTaskListener(System.out, Charset.defaultCharset()));
+    } finally {
+      try {
+        Jenkins.get().removeNode(this);
+      } catch (IOException e) {
+        LOGGER.log(Level.WARNING, "Failed to remove " + name, e);
       }
-    } catch (IOException e) {
-      LOGGER.log(Level.WARNING, "Failed to terminate Mesos instance: "
-          + getInstanceId(), e);
+    }
+  }
+
+  @Override
+  public void _terminate(TaskListener listener) {
+    try {
+      LOGGER.info("Terminating slave " + getNodeName());
+      // Remove the node from jenkins.
+      Jenkins.get().removeNode(this);
+      Mesos mesos = Mesos.getInstance(cloud);
+      mesos.stopJenkinsSlave(name);
+    } catch (Exception e) {
+      LOGGER.log(Level.WARNING, "Failed to terminate Mesos instance: " + getInstanceId(), e);
     }
   }
 
@@ -150,21 +162,15 @@ public class MesosSlave extends Slave {
   }
 
   public boolean isPendingDelete() {
-      return pendingDelete;
+    return pendingDelete;
   }
 
   public void setPendingDelete(boolean pendingDelete) {
-      this.pendingDelete = pendingDelete;
-  }
-
-  public void idleTimeout() {
-    LOGGER.info("Mesos instance idle time expired: " + getInstanceId()
-        + ", terminate now");
-    terminate();
+    this.pendingDelete = pendingDelete;
   }
 
   @Override
-  public Computer createComputer() {
+  public AbstractCloudComputer<MesosJenkinsAgent> createComputer() {
     return new MesosComputer(this);
   }
 
@@ -176,9 +182,9 @@ public class MesosSlave extends Slave {
         // Construct absolute path for slave's remote file system root.
         rootPath = rootPath.absolutize();
       } catch (IOException e) {
-        LOGGER.warning("IO exception while absolutizing slave root path: " +e);
+        LOGGER.warning("IO exception while absolutizing slave root path: " + e);
       } catch (InterruptedException e) {
-        LOGGER.warning("InterruptedException while absolutizing slave root path: " +e);
+        LOGGER.warning("InterruptedException while absolutizing slave root path: " + e);
       }
     }
     // Return root path even if we caught an exception,
@@ -189,22 +195,24 @@ public class MesosSlave extends Slave {
   @Override
   public FilePath getWorkspaceFor(TopLevelItem item) {
 
-    if(!getCloud().isNfsRemoteFSRoot()) {
+    if (!getCloud().isNfsRemoteFSRoot()) {
       return super.getWorkspaceFor(item);
     }
 
     FilePath r = getWorkspaceRoot();
-    if(r==null)     return null;    // offline
+    if (r == null)
+      return null; // offline
     FilePath child = r.child(item.getFullName());
-    if (child!=null && item instanceof AbstractProject) {
+    if (child != null && item instanceof AbstractProject) {
       AbstractProject project = (AbstractProject) item;
-      for (int i=1; ; i++) {
+      for (int i = 1;; i++) {
         FilePath candidate = i == 1 ? child : child.withSuffix(COMBINATOR + i);
         boolean candidateInUse = false;
         for (Object run : project.getBuilds()) {
           if (run instanceof AbstractBuild) {
             AbstractBuild build = (AbstractBuild) run;
-            if (build.isBuilding() && build.getWorkspace()!=null && build.getWorkspace().getBaseName().equals(candidate.getName())) {
+            if (build.isBuilding() && build.getWorkspace() != null
+                && build.getWorkspace().getBaseName().equals(candidate.getName())) {
               candidateInUse = true;
               break;
             }
@@ -222,5 +230,5 @@ public class MesosSlave extends Slave {
   }
 
   // Let us use the same property that is used by Jenkins core to get combinator for workspace
-  private static final String COMBINATOR = System.getProperty(WorkspaceList.class.getName(),"@");
+  private static final String COMBINATOR = System.getProperty(WorkspaceList.class.getName(), "@");
 }

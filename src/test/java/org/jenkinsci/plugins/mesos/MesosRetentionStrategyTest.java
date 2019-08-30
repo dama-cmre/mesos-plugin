@@ -41,9 +41,9 @@ public class MesosRetentionStrategyTest {
     MesosRetentionStrategy mesosRetentionStrategy = new MesosRetentionStrategy(idleTerminationMinutes);
 
     MesosComputer mesosComputer = PowerMockito.mock(MesosComputer.class);
-    MesosSlave mesosSlave = mock(MesosSlave.class);
+    MesosJenkinsAgent MesosJenkinsAgent = mock(MesosJenkinsAgent.class);
 
-    when(mesosComputer.getNode()).thenReturn(mesosSlave);
+    when(mesosComputer.getNode()).thenReturn(MesosJenkinsAgent);
     when(mesosComputer.getConnectTime()).thenReturn(new DateTime().minusMillis(200).getMillis());
 
     // When
@@ -61,9 +61,9 @@ public class MesosRetentionStrategyTest {
     MesosRetentionStrategy mesosRetentionStrategy = new MesosRetentionStrategy(idleTerminationMinutes);
 
     MesosComputer mesosComputer = PowerMockito.mock(MesosComputer.class);
-    MesosSlave mesosSlave = mock(MesosSlave.class);
+    MesosJenkinsAgent MesosJenkinsAgent = mock(MesosJenkinsAgent.class);
 
-    when(mesosComputer.getNode()).thenReturn(mesosSlave);
+    when(mesosComputer.getNode()).thenReturn(MesosJenkinsAgent);
     when(mesosComputer.getConnectTime()).thenReturn(new DateTime().minusMinutes(10).getMillis());
     when(mesosComputer.isOffline()).thenReturn(false);
     when(mesosComputer.isIdle()).thenReturn(true);
@@ -72,7 +72,7 @@ public class MesosRetentionStrategyTest {
     mesosRetentionStrategy.check(mesosComputer);
 
     // Then
-    verify(mesosSlave, never()).terminate();
+    verify(MesosJenkinsAgent, never()).terminate();
   }
 
   @Test
@@ -83,10 +83,10 @@ public class MesosRetentionStrategyTest {
     MesosRetentionStrategy mesosRetentionStrategy = new MesosRetentionStrategy(idleTerminationMinutes);
 
     MesosComputer mesosComputer = PowerMockito.mock(MesosComputer.class);
-    MesosSlave mesosSlave = mock(MesosSlave.class);
+    MesosJenkinsAgent MesosJenkinsAgent = mock(MesosJenkinsAgent.class);
 
-    when(mesosSlave.isPendingDelete()).thenReturn(true);
-    when(mesosComputer.getNode()).thenReturn(mesosSlave);
+    when(MesosJenkinsAgent.isPendingDelete()).thenReturn(true);
+    when(mesosComputer.getNode()).thenReturn(MesosJenkinsAgent);
     when(mesosComputer.getConnectTime()).thenReturn(new DateTime().minusMinutes(10).getMillis());
     when(mesosComputer.isOffline()).thenReturn(false);
     when(mesosComputer.isIdle()).thenReturn(true);

@@ -91,7 +91,7 @@ public class MesosCloud extends Cloud {
 
   // Find the default values for these variables in
   // src/main/resources/org/jenkinsci/plugins/mesos/MesosCloud/config.jelly.
-  private List<MesosSlaveInfo> slaveInfos;
+  private List<MesosAgentSpecs> slaveInfos;
 
   private static Map<String, String> staticMasters = new HashMap<String, String>();
 
@@ -120,8 +120,8 @@ public class MesosCloud extends Cloud {
     Jenkins.AUTOMATIC_SLAVE_LAUNCH = false;
     for (Node n : slaves) {
       // Remove all slaves that were persisted when Jenkins shutdown.
-      if (n instanceof MesosSlave) {
-        ((MesosSlave) n).terminate();
+      if (n instanceof MesosJenkinsAgent) {
+        ((MesosJenkinsAgent) n).terminate();
       }
     }
 
@@ -140,7 +140,7 @@ public class MesosCloud extends Cloud {
 
   @NonNull
   private static Jenkins getJenkins() {
-    Jenkins jenkins = Jenkins.getInstance();
+    Jenkins jenkins = Jenkins.get();
     if (jenkins == null) {
       throw new IllegalStateException("Jenkins is null");
     }
@@ -149,7 +149,7 @@ public class MesosCloud extends Cloud {
 
   @DataBoundConstructor
   public MesosCloud(String nativeLibraryPath, String master, String description, String frameworkName, String role,
-      String slavesUser, String credentialsId, String principal, String secret, List<MesosSlaveInfo> slaveInfos,
+      String slavesUser, String credentialsId, String principal, String secret, List<MesosAgentSpecs> slaveInfos,
       boolean checkpoint, boolean onDemandRegistration, boolean nfsRemoteFSRoot, String jenkinsURL,
       String declineOfferDuration, String cloudID) throws NumberFormatException {
     this("MesosCloud", nativeLibraryPath, master, description, frameworkName, role, slavesUser, credentialsId,
@@ -165,7 +165,7 @@ public class MesosCloud extends Cloud {
    */
   protected MesosCloud(String cloudName, String nativeLibraryPath, String master, String description,
       String frameworkName, String role, String slavesUser, String credentialsId, String principal, String secret,
-      List<MesosSlaveInfo> slaveInfos, boolean checkpoint, boolean onDemandRegistration, boolean nfsRemoteFSRoot,
+      List<MesosAgentSpecs> slaveInfos, boolean checkpoint, boolean onDemandRegistration, boolean nfsRemoteFSRoot,
       String jenkinsURL, String declineOfferDuration, String cloudID) throws NumberFormatException {
     super(cloudName);
 
@@ -387,7 +387,7 @@ public class MesosCloud extends Cloud {
     Metrics.metricRegistry().meter(getMetricName(label, "provision", "request")).mark(excessWorkload);
 
     List<PlannedNode> list = new ArrayList<PlannedNode>();
-    final MesosSlaveInfo slaveInfo = getSlaveInfo(slaveInfos, label);
+    final MesosAgentSpecs slaveInfo = getSlaveInfo(slaveInfos, label);
     if (slaveInfo == null) {
       return list;
     }
@@ -419,7 +419,7 @@ public class MesosCloud extends Cloud {
         Timer.Context context = Metrics.metricRegistry().timer(getMetricName(label, "provision", "submit")).time();
         list.add(new PlannedNode(this.getDisplayName(), Computer.threadPoolForRemoting.submit(new Callable<Node>() {
           public Node call() throws Exception {
-            MesosSlave s = doProvision(numExecutors, slaveInfo, context);
+            MesosJenkinsAgent s = doProvision(numExecutors, slaveInfo, context);
 
             // We do not need to explicitly add the Node here because that is handled by
             // hudson.slaves.NodeProvisioner::update() that checks the result from the
@@ -437,17 +437,17 @@ public class MesosCloud extends Cloud {
     return list;
   }
 
-  private MesosSlave doProvision(int numExecutors, MesosSlaveInfo slaveInfo, Timer.Context provisioningContext)
+  private MesosJenkinsAgent doProvision(int numExecutors, MesosAgentSpecs slaveInfo, Timer.Context provisioningContext)
       throws Descriptor.FormException, IOException {
-    return new MesosSlave(this, MesosUtils.buildNodeName(slaveInfo.getLabelString()), numExecutors, slaveInfo,
-        provisioningContext);
+    return new MesosJenkinsAgent(this, MesosUtils.buildNodeName(slaveInfo.getLabelString()), numExecutors, slaveInfo,
+        provisioningContext, Collections.emptyList());
   }
 
-  public List<MesosSlaveInfo> getSlaveInfos() {
+  public List<MesosAgentSpecs> getSlaveInfos() {
     return slaveInfos;
   }
 
-  public void setSlaveInfos(List<MesosSlaveInfo> slaveInfos) {
+  public void setSlaveInfos(List<MesosAgentSpecs> slaveInfos) {
     this.slaveInfos = slaveInfos;
   }
 
@@ -459,7 +459,7 @@ public class MesosCloud extends Cloud {
     // TODO(vinod): The framework may not have the resources necessary
     // to start a task when it comes time to launch the slave.
     if (slaveInfos != null) {
-      for (MesosSlaveInfo slaveInfo : slaveInfos) {
+      for (MesosAgentSpecs slaveInfo : slaveInfos) {
         if (slaveInfo.matchesLabel(label)) {
           return true;
         }
@@ -599,7 +599,7 @@ public class MesosCloud extends Cloud {
   }
 
   public static MesosCloud get() {
-    return Jenkins.getInstance().clouds.get(MesosCloud.class);
+    return Jenkins.get().clouds.get(MesosCloud.class);
   }
 
   /**
@@ -609,9 +609,9 @@ public class MesosCloud extends Cloud {
     return checkpoint;
   }
 
-  private MesosSlaveInfo getSlaveInfo(List<MesosSlaveInfo> slaveInfos, Label label) {
-    for (MesosSlaveInfo slaveInfo : slaveInfos) {
-      MesosSlaveInfo slaveInfoForLabel = slaveInfo.getMesosSlaveInfoForLabel(label);
+  private MesosAgentSpecs getSlaveInfo(List<MesosAgentSpecs> slaveInfos, Label label) {
+    for (MesosAgentSpecs slaveInfo : slaveInfos) {
+      MesosAgentSpecs slaveInfoForLabel = slaveInfo.getSpecsForLabel(label);
       if (slaveInfoForLabel != null) {
         return slaveInfoForLabel;
       }
@@ -627,7 +627,7 @@ public class MesosCloud extends Cloud {
    */
 
   public JSONObject getSlaveAttributeForLabel(String labelName) {
-    for (MesosSlaveInfo slaveInfo : slaveInfos) {
+    for (MesosAgentSpecs slaveInfo : slaveInfos) {
       if (StringUtils.equals(labelName, slaveInfo.getLabelString())) {
         return slaveInfo.getSlaveAttributes();
       }
@@ -729,7 +729,7 @@ public class MesosCloud extends Cloud {
     @SuppressWarnings("unused") // Used by stapler.
     @RequirePOST
     public ListBoxModel doFillCredentialsIdItems(@AncestorInPath Item item, @QueryParameter String master) {
-      Jenkins.getInstance().checkPermission(Jenkins.ADMINISTER);
+      Jenkins.get().checkPermission(Jenkins.ADMINISTER);
       List<DomainRequirement> domainRequirements = (master == null) ? Collections.<DomainRequirement>emptyList()
           : URIRequirementBuilder.fromUri(master.trim()).build();
       return new StandardListBoxModel().withEmptySelection()
@@ -743,7 +743,7 @@ public class MesosCloud extends Cloud {
     @RequirePOST
     public FormValidation doTestConnection(@QueryParameter("master") String master,
         @QueryParameter("nativeLibraryPath") String nativeLibraryPath) throws IOException, ServletException {
-      Jenkins.getInstance().checkPermission(Jenkins.ADMINISTER);
+      Jenkins.get().checkPermission(Jenkins.ADMINISTER);
       master = master.trim();
 
       if (master.equals("local")) {
@@ -790,7 +790,7 @@ public class MesosCloud extends Cloud {
     }
 
     public FormValidation doCheckDiskNeeded(@QueryParameter String value) {
-      Jenkins.getInstance().checkPermission(Jenkins.ADMINISTER);
+      Jenkins.get().checkPermission(Jenkins.ADMINISTER);
       boolean isValid = true;
       String errorMessage = "Invalid disk space entered. It should be a positive decimal.";
 
@@ -809,7 +809,7 @@ public class MesosCloud extends Cloud {
     }
 
     private FormValidation doCheckCpus(@QueryParameter String value) {
-      Jenkins.getInstance().checkPermission(Jenkins.ADMINISTER);
+      Jenkins.get().checkPermission(Jenkins.ADMINISTER);
       boolean valid = true;
       String errorMessage = "Invalid CPUs value, it should be a positive decimal.";
 
@@ -828,7 +828,7 @@ public class MesosCloud extends Cloud {
     }
 
     public FormValidation doCheckRemoteFSRoot(@QueryParameter String value) {
-      Jenkins.getInstance().checkPermission(Jenkins.ADMINISTER);
+      Jenkins.get().checkPermission(Jenkins.ADMINISTER);
       String errorMessage = "Invalid Remote FS Root - should be non-empty. It will be defaulted to \"jenkins\".";
 
       return StringUtils.isNotBlank(value) ? FormValidation.ok() : FormValidation.error(errorMessage);

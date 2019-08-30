@@ -82,9 +82,9 @@ public class MesosCleanupThread extends AsyncPeriodicWork {
 
         for (final Computer c : getJenkins().getComputers()) {
             if (MesosComputer.class.isInstance(c)) {
-                MesosSlave mesosSlave = (MesosSlave) c.getNode();
+                MesosJenkinsAgent MesosJenkinsAgent = (MesosJenkinsAgent) c.getNode();
 
-                if (mesosSlave != null && mesosSlave.isPendingDelete()) {
+                if (MesosJenkinsAgent != null && MesosJenkinsAgent.isPendingDelete()) {
                     final MesosComputer comp = (MesosComputer) c;
                     computersToDeleteBuilder.add(comp);
                     logger.log(Level.INFO, "Marked " + comp.getName() + " for deletion");
@@ -92,20 +92,21 @@ public class MesosCleanupThread extends AsyncPeriodicWork {
                         public void run() {
                             logger.log(Level.INFO, "Deleting pending node " + comp.getName());
                             try {
-                                MesosSlave node = comp.getNode();
+                                MesosJenkinsAgent node = comp.getNode();
                                 if (node != null) {
                                     node.terminate();
                                 }
                             } catch (RuntimeException e) {
-                                logger.log(Level.WARNING, "Failed to disconnect and delete " + comp.getName() + ": " + e.getMessage());
+                                logger.log(Level.WARNING,
+                                        "Failed to disconnect and delete " + comp.getName() + ": " + e.getMessage());
                                 throw e;
                             }
                         }
                     });
                     deletedNodesBuilder.add(f);
                 } else {
-                    logger.log(Level.FINE, c.getName() + " with slave " + mesosSlave +
-                            " is not pending deletion or the slave is null");
+                    logger.log(Level.FINE, c.getName() + " with slave " + MesosJenkinsAgent
+                            + " is not pending deletion or the slave is null");
                 }
             } else {
                 logger.log(Level.FINER, c.getName() + " is not a mesos computer, it is a " + c.getClass().getName());

@@ -33,52 +33,53 @@ import hudson.util.DescribableList;
 import hudson.util.FormValidation;
 import jenkins.model.Jenkins;
 
-public class MesosSlaveInfo extends AbstractDescribableImpl<MesosSlaveInfo> {
+public class MesosAgentSpecs extends AbstractDescribableImpl<MesosAgentSpecs> {
   @Extension
-  public static class DescriptorImpl extends Descriptor<MesosSlaveInfo> {
-    public FormValidation doCheckMinExecutors(@QueryParameter String minExecutors, @QueryParameter String maxExecutors) {
-      Jenkins.getInstance().checkPermission(Jenkins.ADMINISTER);
+  public static class DescriptorImpl extends Descriptor<MesosAgentSpecs> {
+    public FormValidation doCheckMinExecutors(@QueryParameter String minExecutors,
+        @QueryParameter String maxExecutors) {
+      Jenkins.get().checkPermission(Jenkins.ADMINISTER);
       int minExecutorsVal = Integer.parseInt(minExecutors);
       int maxExecutorsVal = Integer.parseInt(maxExecutors);
 
-      if(minExecutorsVal < 1) {
+      if (minExecutorsVal < 1) {
         return FormValidation.error("minExecutors must at least be equal to 1.");
-      }
-      else if(minExecutorsVal > maxExecutorsVal) {
+      } else if (minExecutorsVal > maxExecutorsVal) {
         return FormValidation.error("minExecutors must be lower than maxExecutors.");
-      }
-      else {
+      } else {
         return FormValidation.ok();
       }
     }
 
-    public FormValidation doCheckMaxExecutors(@QueryParameter String minExecutors, @QueryParameter String maxExecutors) {
-      Jenkins.getInstance().checkPermission(Jenkins.ADMINISTER);
+    public FormValidation doCheckMaxExecutors(@QueryParameter String minExecutors,
+        @QueryParameter String maxExecutors) {
+      Jenkins.get().checkPermission(Jenkins.ADMINISTER);
       int minExecutorsVal = Integer.parseInt(minExecutors);
       int maxExecutorsVal = Integer.parseInt(maxExecutors);
 
-      if(maxExecutorsVal < 1) {
+      if (maxExecutorsVal < 1) {
         return FormValidation.error("maxExecutors must at least be equal to 1.");
-      }
-      else if(maxExecutorsVal < minExecutorsVal) {
+      } else if (maxExecutorsVal < minExecutorsVal) {
         return FormValidation.error("maxExecutors must be higher than minExecutors.");
-      }
-      else {
+      } else {
         return FormValidation.ok();
       }
     }
 
-    public String getDisplayName() { return ""; }
+    public String getDisplayName() {
+      return "";
+    }
 
     public Class<? extends Node> getNodeClass() {
-      return MesosSlave.class;
+      return MesosJenkinsAgent.class;
     }
   }
 
   private static final String DEFAULT_JVM_ARGS = "-Xms16m -XX:+UseConcMarkSweepGC -Djava.net.preferIPv4Stack=true";
   private static final String JVM_ARGS_PATTERN = "-Xmx.+ ";
   private static final String CUSTOM_IMAGE_SEPARATOR = ":";
-  private static final Pattern CUSTOM_IMAGE_FROM_LABEL_PATTERN = Pattern.compile(CUSTOM_IMAGE_SEPARATOR + "([\\w\\.\\-/:]+[\\w])");
+  private static final Pattern CUSTOM_IMAGE_FROM_LABEL_PATTERN = Pattern
+      .compile(CUSTOM_IMAGE_SEPARATOR + "([\\w\\.\\-/:]+[\\w])");
   private final double slaveCpus;
   private final double diskNeeded; //MB
   private final int slaveMem; // MB.
@@ -99,39 +100,56 @@ public class MesosSlaveInfo extends AbstractDescribableImpl<MesosSlaveInfo> {
   private final ContainerInfo containerInfo;
   private final List<URI> additionalURIs;
   private final Mode mode;
-  private /*almost final*/ DescribableList<NodeProperty<?>,NodePropertyDescriptor> nodeProperties = new DescribableList<NodeProperty<?>,NodePropertyDescriptor>(Jenkins.getInstance());
+  //  private /*almost final*/ DescribableList<NodeProperty<?>, NodePropertyDescriptor> nodeProperties = new DescribableList<NodeProperty<?>, NodePropertyDescriptor>(
+  //      Jenkins.get());
 
   @CheckForNull
   private String labelString;
 
-  private static final Logger LOGGER = Logger.getLogger(MesosSlaveInfo.class
-      .getName());
+  private static final Logger LOGGER = Logger.getLogger(MesosAgentSpecs.class.getName());
 
   @Override
   public boolean equals(Object o) {
-    if (this == o) return true;
-    if (o == null || getClass() != o.getClass()) return false;
-
-    MesosSlaveInfo that = (MesosSlaveInfo) o;
-
-    if (Double.compare(that.slaveCpus, slaveCpus) != 0) return false;
-    if (slaveMem != that.slaveMem) return false;
-    if (Double.compare(that.executorCpus, executorCpus) != 0) return false;
-    if (Double.compare(that.diskNeeded, diskNeeded) !=0 ) return false;
-    if (minExecutors != that.minExecutors) return false;
-    if (maxExecutors != that.maxExecutors) return false;
-    if (executorMem != that.executorMem) return false;
-    if (idleTerminationMinutes != that.idleTerminationMinutes) return false;
-    if (remoteFSRoot != null ? !remoteFSRoot.equals(that.remoteFSRoot) : that.remoteFSRoot != null) return false;
-    if (jvmArgs != null ? !jvmArgs.equals(that.jvmArgs) : that.jvmArgs != null) return false;
-    if (jnlpArgs != null ? !jnlpArgs.equals(that.jnlpArgs) : that.jnlpArgs != null) return false;
-    if (slaveAttributesString != null ? !slaveAttributesString.equals(that.slaveAttributesString) : that.slaveAttributesString != null)
+    if (this == o)
+      return true;
+    if (o == null || getClass() != o.getClass())
       return false;
-    if (containerInfo != null ? !containerInfo.equals(that.containerInfo) : that.containerInfo != null) return false;
+
+    MesosAgentSpecs that = (MesosAgentSpecs) o;
+
+    if (Double.compare(that.slaveCpus, slaveCpus) != 0)
+      return false;
+    if (slaveMem != that.slaveMem)
+      return false;
+    if (Double.compare(that.executorCpus, executorCpus) != 0)
+      return false;
+    if (Double.compare(that.diskNeeded, diskNeeded) != 0)
+      return false;
+    if (minExecutors != that.minExecutors)
+      return false;
+    if (maxExecutors != that.maxExecutors)
+      return false;
+    if (executorMem != that.executorMem)
+      return false;
+    if (idleTerminationMinutes != that.idleTerminationMinutes)
+      return false;
+    if (remoteFSRoot != null ? !remoteFSRoot.equals(that.remoteFSRoot) : that.remoteFSRoot != null)
+      return false;
+    if (jvmArgs != null ? !jvmArgs.equals(that.jvmArgs) : that.jvmArgs != null)
+      return false;
+    if (jnlpArgs != null ? !jnlpArgs.equals(that.jnlpArgs) : that.jnlpArgs != null)
+      return false;
+    if (slaveAttributesString != null ? !slaveAttributesString.equals(that.slaveAttributesString)
+        : that.slaveAttributesString != null)
+      return false;
+    if (containerInfo != null ? !containerInfo.equals(that.containerInfo) : that.containerInfo != null)
+      return false;
     if (additionalURIs != null ? !additionalURIs.equals(that.additionalURIs) : that.additionalURIs != null)
       return false;
-    if (mode != that.mode) return false;
-    if (nodeProperties != null ? !nodeProperties.equals(that.nodeProperties) : that.nodeProperties != null) return false;
+    if (mode != that.mode)
+      return false;
+    // if (nodeProperties != null ? !nodeProperties.equals(that.nodeProperties) : that.nodeProperties != null)
+    //   return false;
     return labelString != null ? labelString.equals(that.labelString) : that.labelString == null;
 
   }
@@ -158,105 +176,63 @@ public class MesosSlaveInfo extends AbstractDescribableImpl<MesosSlaveInfo> {
     result = 31 * result + (containerInfo != null ? containerInfo.hashCode() : 0);
     result = 31 * result + (additionalURIs != null ? additionalURIs.hashCode() : 0);
     result = 31 * result + (mode != null ? mode.hashCode() : 0);
-    result = 31 * result + (nodeProperties != null ? nodeProperties.hashCode() : 0);
+    // result = 31 * result + (nodeProperties != null ? nodeProperties.hashCode() : 0);
     result = 31 * result + (labelString != null ? labelString.hashCode() : 0);
     return result;
   }
 
   @DataBoundConstructor
-  public MesosSlaveInfo(
-      String labelString,
-      Mode mode,
-      String slaveCpus,
-      String slaveMem,
-      String minExecutors,
-      String maxExecutors,
-      String executorCpus,
-      String diskNeeded,
-      String executorMem,
-      String remoteFSRoot,
-      String idleTerminationMinutes,
-      String slaveAttributes,
-      String jvmArgs,
-      String jnlpArgs,
-      String defaultSlave,
-      String windowsAgent,
-      ContainerInfo containerInfo,
-      List<URI> additionalURIs,
-      List<? extends NodeProperty<?>> nodeProperties)
-      throws IOException, NumberFormatException {
+  public MesosAgentSpecs(String labelString, Mode mode, String slaveCpus, String slaveMem, String minExecutors,
+      String maxExecutors, String executorCpus, String diskNeeded, String executorMem, String remoteFSRoot,
+      String idleTerminationMinutes, String slaveAttributes, String jvmArgs, String jnlpArgs, String defaultSlave,
+      String windowsAgent, ContainerInfo containerInfo, List<URI> additionalURIs
+  /* List<? extends NodeProperty<?>> nodeProperties */) throws IOException, NumberFormatException {
     // Parse the attributes provided from the cloud config
-    this(
-              Util.fixEmptyAndTrim(labelString),
-              mode != null ? mode : Mode.NORMAL,
-              Double.parseDouble(slaveCpus),
-              Integer.parseInt(slaveMem),
-              Integer.parseInt(minExecutors),
-              Integer.parseInt(maxExecutors),
-              Double.parseDouble(executorCpus),
-              Double.parseDouble(diskNeeded),
-              Integer.parseInt(executorMem),
-              StringUtils.isNotBlank(remoteFSRoot) ? remoteFSRoot.trim() : "jenkins",
-              Integer.parseInt(idleTerminationMinutes),
-              parseSlaveAttributes(slaveAttributes),
-              StringUtils.isNotBlank(jvmArgs) ? cleanseJvmArgs(jvmArgs) : DEFAULT_JVM_ARGS,
-              StringUtils.isNotBlank(jnlpArgs) ? jnlpArgs : "",
-              Boolean.valueOf(defaultSlave),
-              Boolean.valueOf(windowsAgent),
-              containerInfo,
-              additionalURIs,
-              nodeProperties);
+    this(Util.fixEmptyAndTrim(labelString), mode != null ? mode : Mode.NORMAL, Double.parseDouble(slaveCpus),
+        Integer.parseInt(slaveMem), Integer.parseInt(minExecutors), Integer.parseInt(maxExecutors),
+        Double.parseDouble(executorCpus), Double.parseDouble(diskNeeded), Integer.parseInt(executorMem),
+        StringUtils.isNotBlank(remoteFSRoot) ? remoteFSRoot.trim() : "jenkins",
+        Integer.parseInt(idleTerminationMinutes), parseSlaveAttributes(slaveAttributes),
+        StringUtils.isNotBlank(jvmArgs) ? cleanseJvmArgs(jvmArgs) : DEFAULT_JVM_ARGS,
+        StringUtils.isNotBlank(jnlpArgs) ? jnlpArgs : "", Boolean.valueOf(defaultSlave), Boolean.valueOf(windowsAgent),
+        containerInfo, additionalURIs /*nodeProperties*/);
   }
 
-  public MesosSlaveInfo(
-      String labelString,
-      Mode mode,
-      double slaveCpus,
-      int slaveMem,
-      int minExecutors,
-      int maxExecutors,
-      double executorCpus,
-      double diskNeeded,
-      int executorMem,
-      String remoteFSRoot,
-      int idleTerminationMinutes,
-      JSONObject slaveAttributes,
-      String jvmArgs,
-      String jnlpArgs,
-      Boolean defaultSlave,
-      Boolean windowsAgent,
-      ContainerInfo containerInfo,
-      List<URI> additionalURIs,
-      List<? extends NodeProperty<?>> nodeProperties)
+  public MesosAgentSpecs(String labelString, Mode mode, double slaveCpus, int slaveMem, int minExecutors,
+      int maxExecutors, double executorCpus, double diskNeeded, int executorMem, String remoteFSRoot,
+      int idleTerminationMinutes, JSONObject slaveAttributes, String jvmArgs, String jnlpArgs, Boolean defaultSlave,
+      Boolean windowsAgent, ContainerInfo containerInfo,
+      List<URI> additionalURIs/*,
+                              List<? extends NodeProperty<?>> nodeProperties*/)
       throws IOException, NumberFormatException {
-      this.labelString = labelString;
-      this.mode = mode;
-      this.slaveCpus = slaveCpus;
-      this.slaveMem = slaveMem;
-      this.minExecutors = minExecutors < 1 ? 1 : minExecutors; // Ensure minExecutors is at least equal to 1
-      this.maxExecutors = maxExecutors;
-      this.executorCpus = executorCpus;
-      this.diskNeeded = diskNeeded;
-      this.executorMem = executorMem;
-      this.remoteFSRoot = remoteFSRoot;
-      this.idleTerminationMinutes = idleTerminationMinutes;
-      this.slaveAttributesString = slaveAttributes != null ? slaveAttributes.toString() : null;
-      this.jvmArgs = jvmArgs;
-      this.jnlpArgs = jnlpArgs;
-      this.defaultSlave = defaultSlave;
-      this.windowsAgent = windowsAgent;
-      this.containerInfo = containerInfo;
-      this.additionalURIs = additionalURIs;
-      this.nodeProperties.replaceBy(nodeProperties == null ? new ArrayList<NodeProperty<?>>() : nodeProperties);
+    this.labelString = labelString;
+    this.mode = mode;
+    this.slaveCpus = slaveCpus;
+    this.slaveMem = slaveMem;
+    this.minExecutors = minExecutors < 1 ? 1 : minExecutors; // Ensure minExecutors is at least equal to 1
+    this.maxExecutors = maxExecutors;
+    this.executorCpus = executorCpus;
+    this.diskNeeded = diskNeeded;
+    this.executorMem = executorMem;
+    this.remoteFSRoot = remoteFSRoot;
+    this.idleTerminationMinutes = idleTerminationMinutes;
+    this.slaveAttributesString = slaveAttributes != null ? slaveAttributes.toString() : null;
+    this.jvmArgs = jvmArgs;
+    this.jnlpArgs = jnlpArgs;
+    this.defaultSlave = defaultSlave;
+    this.windowsAgent = windowsAgent;
+    this.containerInfo = containerInfo;
+    this.additionalURIs = additionalURIs;
+    //    this.nodeProperties.replaceBy(nodeProperties == null ? new ArrayList<NodeProperty<?>>() : nodeProperties);
   }
 
   private static JSONObject parseSlaveAttributes(String slaveAttributes) {
     if (StringUtils.isNotBlank(slaveAttributes)) {
-        try {
-            return (JSONObject) JSONSerializer.toJSON(slaveAttributes);
-        } catch (JSONException e) {
-            LOGGER.warning("Ignoring Mesos slave attributes JSON due to parsing error : " + slaveAttributes);
-        }
+      try {
+        return (JSONObject) JSONSerializer.toJSON(slaveAttributes);
+      } catch (JSONException e) {
+        LOGGER.warning("Ignoring Mesos slave attributes JSON due to parsing error : " + slaveAttributes);
+      }
     }
 
     return null;
@@ -266,31 +242,14 @@ public class MesosSlaveInfo extends AbstractDescribableImpl<MesosSlaveInfo> {
     return diskNeeded;
   }
 
-  public MesosSlaveInfo copyWithDockerImage(String label, String dockerImage) {
+  public MesosAgentSpecs copyWithDockerImage(String label, String dockerImage) {
     LOGGER.fine(String.format("Customize mesos slave %s using docker image %s", this.getLabelString(), dockerImage));
 
     try {
-      return new MesosSlaveInfo(
-              label,
-              mode,
-              slaveCpus,
-              slaveMem,
-              minExecutors,
-              maxExecutors,
-              executorCpus,
-              diskNeeded,
-              executorMem,
-              remoteFSRoot,
-              idleTerminationMinutes,
-              parseSlaveAttributes(slaveAttributesString),
-              jvmArgs,
-              jnlpArgs,
-              defaultSlave,
-              windowsAgent,
-              containerInfo.copyWithDockerImage(dockerImage),
-              additionalURIs,
-              nodeProperties
-      );
+      return new MesosAgentSpecs(label, mode, slaveCpus, slaveMem, minExecutors, maxExecutors, executorCpus, diskNeeded,
+          executorMem, remoteFSRoot, idleTerminationMinutes, parseSlaveAttributes(slaveAttributesString), jvmArgs,
+          jnlpArgs, defaultSlave, windowsAgent, containerInfo.copyWithDockerImage(dockerImage), additionalURIs
+      /* nodeProperties */);
     } catch (Descriptor.FormException e) {
       LOGGER.log(Level.WARNING, "Failed to create customized mesos container info", e);
       return null;
@@ -369,10 +328,10 @@ public class MesosSlaveInfo extends AbstractDescribableImpl<MesosSlaveInfo> {
     return additionalURIs;
   }
 
-  public DescribableList<NodeProperty<?>, NodePropertyDescriptor> getNodeProperties() {
-    assert nodeProperties != null;
-    return nodeProperties;
-  }
+  // public DescribableList<NodeProperty<?>, NodePropertyDescriptor> getNodeProperties() {
+  //   assert nodeProperties != null;
+  //   return nodeProperties;
+  // }
 
   /**
    * Removes any additional {@code -Xmx} JVM args from the provided JVM
@@ -414,9 +373,9 @@ public class MesosSlaveInfo extends AbstractDescribableImpl<MesosSlaveInfo> {
   }
 
   public Object readResolve() {
-    if (nodeProperties == null) {
-      nodeProperties = new DescribableList<NodeProperty<?>,NodePropertyDescriptor>(Jenkins.getInstance());
-    }
+    // if (nodeProperties == null) {
+    //   nodeProperties = new DescribableList<NodeProperty<?>, NodePropertyDescriptor>(Jenkins.get());
+    // }
     if (minExecutors == 0) {
       this.minExecutors = 1;
     }
@@ -441,7 +400,7 @@ public class MesosSlaveInfo extends AbstractDescribableImpl<MesosSlaveInfo> {
     return Label.get(label.toString().replace(CUSTOM_IMAGE_SEPARATOR + customDockerImage, ""));
   }
 
-  public MesosSlaveInfo getMesosSlaveInfoForLabel(Label label) {
+  public MesosAgentSpecs getSpecsForLabel(Label label) {
     if (!matchesLabel(label)) {
       return null;
     }
@@ -490,12 +449,15 @@ public class MesosSlaveInfo extends AbstractDescribableImpl<MesosSlaveInfo> {
 
     @Override
     public boolean equals(Object o) {
-      if (this == o) return true;
-      if (o == null || getClass() != o.getClass()) return false;
+      if (this == o)
+        return true;
+      if (o == null || getClass() != o.getClass())
+        return false;
 
       ExternalContainerInfo that = (ExternalContainerInfo) o;
 
-      if (image != null ? !image.equals(that.image) : that.image != null) return false;
+      if (image != null ? !image.equals(that.image) : that.image != null)
+        return false;
       return options != null ? options.equals(that.options) : that.options == null;
 
     }
@@ -511,7 +473,9 @@ public class MesosSlaveInfo extends AbstractDescribableImpl<MesosSlaveInfo> {
   public static class ContainerInfo extends AbstractDescribableImpl<ContainerInfo> {
     @Extension
     public static class DescriptorImpl extends Descriptor<ContainerInfo> {
-      public String getDisplayName() { return ""; }
+      public String getDisplayName() {
+        return "";
+      }
     }
 
     private final String type;
@@ -529,18 +493,10 @@ public class MesosSlaveInfo extends AbstractDescribableImpl<MesosSlaveInfo> {
     private final boolean dockerImageCustomizable;
 
     @DataBoundConstructor
-    public ContainerInfo(String type,
-                         String dockerImage,
-                         boolean dockerPrivilegedMode,
-                         boolean dockerForcePullImage,
-                         boolean dockerImageCustomizable,
-                         boolean useCustomDockerCommandShell,
-                         String customDockerCommandShell,
-                         List<Volume> volumes,
-                         List<Parameter> parameters,
-                         String networking,
-                         List<PortMapping> portMappings,
-                         List<NetworkInfo> networkInfos) throws FormException {
+    public ContainerInfo(String type, String dockerImage, boolean dockerPrivilegedMode, boolean dockerForcePullImage,
+        boolean dockerImageCustomizable, boolean useCustomDockerCommandShell, String customDockerCommandShell,
+        List<Volume> volumes, List<Parameter> parameters, String networking, List<PortMapping> portMappings,
+        List<NetworkInfo> networkInfos) throws FormException {
       this.type = type;
       this.dockerImage = dockerImage;
       this.dockerPrivilegedMode = dockerPrivilegedMode;
@@ -553,33 +509,22 @@ public class MesosSlaveInfo extends AbstractDescribableImpl<MesosSlaveInfo> {
       this.networkInfos = networkInfos;
 
       if (networking == null) {
-          this.networking = DEFAULT_NETWORKING;
+        this.networking = DEFAULT_NETWORKING;
       } else {
-          this.networking = networking;
+        this.networking = networking;
       }
 
       if (Network.HOST.equals(Network.valueOf(networking))) {
-          this.portMappings = Collections.emptyList();
+        this.portMappings = Collections.emptyList();
       } else {
-          this.portMappings = portMappings;
+        this.portMappings = portMappings;
       }
     }
 
     public ContainerInfo copyWithDockerImage(String dockerImage) throws FormException {
-        return new ContainerInfo(
-                type,
-                dockerImage,  // custom docker image
-                dockerPrivilegedMode,
-                dockerForcePullImage,
-                dockerImageCustomizable,
-                useCustomDockerCommandShell,
-                customDockerCommandShell,
-                volumes,
-                parameters,
-                networking,
-                portMappings,
-                networkInfos
-        );
+      return new ContainerInfo(type, dockerImage, // custom docker image
+          dockerPrivilegedMode, dockerForcePullImage, dockerImageCustomizable, useCustomDockerCommandShell,
+          customDockerCommandShell, volumes, parameters, networking, portMappings, networkInfos);
     }
 
     public String getType() {
@@ -599,8 +544,8 @@ public class MesosSlaveInfo extends AbstractDescribableImpl<MesosSlaveInfo> {
     }
 
     public List<NetworkInfo> getNetworkInfos() {
-          return networkInfos;
-      }
+      return networkInfos;
+    }
 
     public boolean hasNetworkInfos() {
       return networkInfos != null && !networkInfos.isEmpty();
@@ -638,29 +583,46 @@ public class MesosSlaveInfo extends AbstractDescribableImpl<MesosSlaveInfo> {
       return dockerImageCustomizable;
     }
 
-    public boolean getUseCustomDockerCommandShell() {  return useCustomDockerCommandShell; }
+    public boolean getUseCustomDockerCommandShell() {
+      return useCustomDockerCommandShell;
+    }
 
-    public String getCustomDockerCommandShell() {  return customDockerCommandShell; }
+    public String getCustomDockerCommandShell() {
+      return customDockerCommandShell;
+    }
 
     @Override
     public boolean equals(Object o) {
-      if (this == o) return true;
-      if (o == null || getClass() != o.getClass()) return false;
+      if (this == o)
+        return true;
+      if (o == null || getClass() != o.getClass())
+        return false;
 
       ContainerInfo that = (ContainerInfo) o;
 
-      if (useCustomDockerCommandShell != that.useCustomDockerCommandShell) return false;
-      if (type != null ? !type.equals(that.type) : that.type != null) return false;
-      if (dockerImage != null ? !dockerImage.equals(that.dockerImage) : that.dockerImage != null) return false;
-      if (volumes != null ? !volumes.equals(that.volumes) : that.volumes != null) return false;
-      if (parameters != null ? !parameters.equals(that.parameters) : that.parameters != null) return false;
-      if (networking != null ? !networking.equals(that.networking) : that.networking != null) return false;
-      if (portMappings != null ? !portMappings.equals(that.portMappings) : that.portMappings != null) return false;
-      if (networkInfos != null ? !networkInfos.equals(that.networkInfos) : that.networkInfos != null) return false;
-      if (customDockerCommandShell != null ? !customDockerCommandShell.equals(that.customDockerCommandShell) : that.customDockerCommandShell != null)
+      if (useCustomDockerCommandShell != that.useCustomDockerCommandShell)
         return false;
-      if (dockerPrivilegedMode != that.dockerPrivilegedMode) return false;
-      if (dockerForcePullImage != that.dockerForcePullImage) return false;
+      if (type != null ? !type.equals(that.type) : that.type != null)
+        return false;
+      if (dockerImage != null ? !dockerImage.equals(that.dockerImage) : that.dockerImage != null)
+        return false;
+      if (volumes != null ? !volumes.equals(that.volumes) : that.volumes != null)
+        return false;
+      if (parameters != null ? !parameters.equals(that.parameters) : that.parameters != null)
+        return false;
+      if (networking != null ? !networking.equals(that.networking) : that.networking != null)
+        return false;
+      if (portMappings != null ? !portMappings.equals(that.portMappings) : that.portMappings != null)
+        return false;
+      if (networkInfos != null ? !networkInfos.equals(that.networkInfos) : that.networkInfos != null)
+        return false;
+      if (customDockerCommandShell != null ? !customDockerCommandShell.equals(that.customDockerCommandShell)
+          : that.customDockerCommandShell != null)
+        return false;
+      if (dockerPrivilegedMode != that.dockerPrivilegedMode)
+        return false;
+      if (dockerForcePullImage != that.dockerForcePullImage)
+        return false;
       return dockerImageCustomizable == that.dockerImageCustomizable;
     }
 
@@ -685,7 +647,9 @@ public class MesosSlaveInfo extends AbstractDescribableImpl<MesosSlaveInfo> {
   public static class Parameter extends AbstractDescribableImpl<Parameter> {
     @Extension
     public static class DescriptorImpl extends Descriptor<Parameter> {
-      public String getDisplayName() { return ""; }
+      public String getDisplayName() {
+        return "";
+      }
     }
 
     private final String key;
@@ -707,12 +671,15 @@ public class MesosSlaveInfo extends AbstractDescribableImpl<MesosSlaveInfo> {
 
     @Override
     public boolean equals(Object o) {
-      if (this == o) return true;
-      if (o == null || getClass() != o.getClass()) return false;
+      if (this == o)
+        return true;
+      if (o == null || getClass() != o.getClass())
+        return false;
 
       Parameter parameter = (Parameter) o;
 
-      if (key != null ? !key.equals(parameter.key) : parameter.key != null) return false;
+      if (key != null ? !key.equals(parameter.key) : parameter.key != null)
+        return false;
       return value != null ? value.equals(parameter.value) : parameter.value == null;
 
     }
@@ -728,7 +695,9 @@ public class MesosSlaveInfo extends AbstractDescribableImpl<MesosSlaveInfo> {
   public static class PortMapping extends AbstractDescribableImpl<PortMapping> {
     @Extension
     public static class DescriptorImpl extends Descriptor<PortMapping> {
-      public String getDisplayName() { return ""; }
+      public String getDisplayName() {
+        return "";
+      }
     }
 
     // TODO validate 1 to 65535
@@ -738,37 +707,41 @@ public class MesosSlaveInfo extends AbstractDescribableImpl<MesosSlaveInfo> {
 
     @DataBoundConstructor
     public PortMapping(Integer containerPort, Integer hostPort, String protocol) {
-        this.containerPort = containerPort;
-        this.hostPort = hostPort;
-        this.protocol = protocol;
+      this.containerPort = containerPort;
+      this.hostPort = hostPort;
+      this.protocol = protocol;
     }
 
     public Integer getContainerPort() {
-        return containerPort;
+      return containerPort;
     }
 
     public Integer getHostPort() {
-        return hostPort;
+      return hostPort;
     }
 
     public String getProtocol() {
-        return protocol;
+      return protocol;
     }
 
     @Override
     public String toString() {
-        return (hostPort == null ? 0 : hostPort) + ":" + containerPort;
+      return (hostPort == null ? 0 : hostPort) + ":" + containerPort;
     }
 
     @Override
     public boolean equals(Object o) {
-      if (this == o) return true;
-      if (o == null || getClass() != o.getClass()) return false;
+      if (this == o)
+        return true;
+      if (o == null || getClass() != o.getClass())
+        return false;
 
       PortMapping that = (PortMapping) o;
 
-      if (containerPort != null ? !containerPort.equals(that.containerPort) : that.containerPort != null) return false;
-      if (hostPort != null ? !hostPort.equals(that.hostPort) : that.hostPort != null) return false;
+      if (containerPort != null ? !containerPort.equals(that.containerPort) : that.containerPort != null)
+        return false;
+      if (hostPort != null ? !hostPort.equals(that.hostPort) : that.hostPort != null)
+        return false;
       return protocol != null ? protocol.equals(that.protocol) : that.protocol == null;
 
     }
@@ -785,7 +758,9 @@ public class MesosSlaveInfo extends AbstractDescribableImpl<MesosSlaveInfo> {
   public static class Volume extends AbstractDescribableImpl<Volume> {
     @Extension
     public static class DescriptorImpl extends Descriptor<Volume> {
-      public String getDisplayName() { return ""; }
+      public String getDisplayName() {
+        return "";
+      }
     }
 
     private final String containerPath;
@@ -813,12 +788,15 @@ public class MesosSlaveInfo extends AbstractDescribableImpl<MesosSlaveInfo> {
 
     @Override
     public boolean equals(Object o) {
-      if (this == o) return true;
-      if (o == null || getClass() != o.getClass()) return false;
+      if (this == o)
+        return true;
+      if (o == null || getClass() != o.getClass())
+        return false;
 
       Volume volume = (Volume) o;
 
-      if (readOnly != volume.readOnly) return false;
+      if (readOnly != volume.readOnly)
+        return false;
       if (containerPath != null ? !containerPath.equals(volume.containerPath) : volume.containerPath != null)
         return false;
       return hostPath != null ? hostPath.equals(volume.hostPath) : volume.hostPath == null;
@@ -837,7 +815,9 @@ public class MesosSlaveInfo extends AbstractDescribableImpl<MesosSlaveInfo> {
   public static class URI extends AbstractDescribableImpl<URI> {
     @Extension
     public static class DescriptorImpl extends Descriptor<URI> {
-      public String getDisplayName() { return ""; }
+      public String getDisplayName() {
+        return "";
+      }
     }
 
     private final String value;
@@ -865,13 +845,17 @@ public class MesosSlaveInfo extends AbstractDescribableImpl<MesosSlaveInfo> {
 
     @Override
     public boolean equals(Object o) {
-      if (this == o) return true;
-      if (o == null || getClass() != o.getClass()) return false;
+      if (this == o)
+        return true;
+      if (o == null || getClass() != o.getClass())
+        return false;
 
       URI uri = (URI) o;
 
-      if (executable != uri.executable) return false;
-      if (extract != uri.extract) return false;
+      if (executable != uri.executable)
+        return false;
+      if (extract != uri.extract)
+        return false;
       return value != null ? value.equals(uri.value) : uri.value == null;
 
     }
@@ -888,18 +872,20 @@ public class MesosSlaveInfo extends AbstractDescribableImpl<MesosSlaveInfo> {
   public static class NetworkInfo extends AbstractDescribableImpl<NetworkInfo> {
     @Extension
     public static class DescriptorImpl extends Descriptor<NetworkInfo> {
-        public String getDisplayName() { return ""; }
+      public String getDisplayName() {
+        return "";
+      }
     }
 
     private final String networkName;
 
     @DataBoundConstructor
     public NetworkInfo(String networkName) {
-        this.networkName = networkName;
+      this.networkName = networkName;
     }
 
     public String getNetworkName() {
-        return networkName;
+      return networkName;
     }
 
     public boolean hasNetworkName() {
@@ -908,20 +894,22 @@ public class MesosSlaveInfo extends AbstractDescribableImpl<MesosSlaveInfo> {
 
     @Override
     public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
+      if (this == o)
+        return true;
+      if (o == null || getClass() != o.getClass())
+        return false;
 
-        NetworkInfo networkInfo = (NetworkInfo) o;
+      NetworkInfo networkInfo = (NetworkInfo) o;
 
-        return networkName != null ? networkName.equals(networkInfo.networkName) : networkInfo.networkName == null;
+      return networkName != null ? networkName.equals(networkInfo.networkName) : networkInfo.networkName == null;
 
     }
 
     @Override
     public int hashCode() {
-        int result = networkName != null ? networkName.hashCode() : 0;
-        return result;
+      int result = networkName != null ? networkName.hashCode() : 0;
+      return result;
     }
-}
+  }
 
 }
