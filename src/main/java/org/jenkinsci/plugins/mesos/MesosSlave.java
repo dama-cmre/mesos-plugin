@@ -23,6 +23,8 @@ import hudson.slaves.WorkspaceList;
 import jenkins.model.Jenkins;
 
 import java.io.IOException;
+import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -33,6 +35,8 @@ public class MesosSlave extends Slave {
 
   private static final long serialVersionUID = 1L;
 
+  private final Object lock = new Object();
+
   private final String cloudName;
   private transient MesosCloud cloud;
   private final MesosSlaveInfo slaveInfo;
@@ -40,7 +44,13 @@ public class MesosSlave extends Slave {
   private final double cpus;
   private final int mem;
   private final double diskNeeded;
-  private transient final Timer.Context provisioningContext;
+  private final UUID uuid = UUID.randomUUID();
+  private transient final Timer.Context provisionToReady;
+  private transient final Timer.Context provisionToMesos;
+  private transient final Timer mesosToReady;
+  private transient long mesosHandoffTime;
+  private boolean singleUse;
+
 
 
   private boolean pendingDelete;
@@ -48,7 +58,13 @@ public class MesosSlave extends Slave {
   private static final Logger LOGGER = Logger.getLogger(MesosSlave.class
       .getName());
 
-  public MesosSlave(MesosCloud cloud, String name, int numExecutors, MesosSlaveInfo slaveInfo, Timer.Context provisioningContext) throws IOException, FormException {
+  public MesosSlave(MesosCloud cloud,
+                    String name,
+                    int numExecutors,
+                    MesosSlaveInfo slaveInfo,
+                    Timer.Context provisionToReadyContext,
+                    Timer.Context provisionToMesosContext,
+                    Timer mesosToReady) throws IOException, FormException {
     super(name,
           slaveInfo.getLabelString(), // node description.
           StringUtils.isBlank(slaveInfo.getRemoteFSRoot()) ? "jenkins" : slaveInfo.getRemoteFSRoot().trim(),   // remoteFS.
@@ -65,7 +81,10 @@ public class MesosSlave extends Slave {
     this.cpus = slaveInfo.getSlaveCpus() + (numExecutors * slaveInfo.getExecutorCpus());
     this.mem = slaveInfo.getSlaveMem() + (numExecutors * slaveInfo.getExecutorMem());
     this.diskNeeded = slaveInfo.getdiskNeeded();
-    this.provisioningContext = provisioningContext;
+    this.provisionToReady = provisionToReadyContext;
+    this.provisionToMesos = provisionToMesosContext;
+    this.mesosToReady = mesosToReady;
+    this.singleUse = false;
     LOGGER.fine("Constructing Mesos slave " + name + " from cloud " + cloud.getDescription());
   }
 
@@ -105,8 +124,18 @@ public class MesosSlave extends Slave {
     return idleTerminationMinutes;
   }
 
-  public Timer.Context getProvisioningContext() {
-    return provisioningContext;
+  public void provisionedAndReady() {
+    mesosToReady.update(System.currentTimeMillis() - mesosHandoffTime, TimeUnit.MILLISECONDS);
+    provisionToReady.stop();
+  }
+
+  public void provisionedToMesos() {
+    provisionToMesos.stop();
+    mesosHandoffTime = System.currentTimeMillis();
+  }
+
+  public UUID getUuid() {
+    return uuid;
   }
 
   public void terminate() {
@@ -150,11 +179,27 @@ public class MesosSlave extends Slave {
   }
 
   public boolean isPendingDelete() {
+    synchronized (lock) {
       return pendingDelete;
+    }
   }
 
   public void setPendingDelete(boolean pendingDelete) {
+    synchronized (lock) {
       this.pendingDelete = pendingDelete;
+    }
+  }
+
+  public boolean isSingleUse() {
+    synchronized (lock) {
+      return singleUse;
+    }
+  }
+
+  public void setSingleUse(boolean singleUse) {
+    synchronized (lock) {
+      this.singleUse = singleUse;
+    }
   }
 
   public void idleTimeout() {
