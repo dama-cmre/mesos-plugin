@@ -18,6 +18,7 @@ package org.jenkinsci.plugins.mesos;
 import com.cloudbees.plugins.credentials.common.StandardUsernamePasswordCredentials;
 import com.codahale.metrics.Timer;
 import com.google.common.annotations.VisibleForTesting;
+import com.google.protobuf.TextFormat;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import hudson.model.Computer;
 import hudson.model.Node;
@@ -40,10 +41,22 @@ import org.apache.mesos.Protos.Volume.Mode;
 import org.apache.mesos.Scheduler;
 import org.apache.mesos.SchedulerDriver;
 
-import java.util.*;
+import java.util.Queue;
+import java.util.Set;
+import java.util.SortedSet;
+import java.util.HashSet;
+import java.util.TreeSet;
+import java.util.Map;
+import java.util.HashMap;
+import java.util.List;
+import java.util.LinkedList;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Iterator;
+import java.util.Date;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -62,10 +75,8 @@ public class JenkinsScheduler implements Scheduler {
     // overhead.
     private static final double JVM_MEM_OVERHEAD_FACTOR = 0.1;
 
-    private static final String SLAVE_COMMAND_FORMAT =
-        "java -DHUDSON_HOME=jenkins -server -Xmx%dm %s -jar ${MESOS_SANDBOX-.}/agent.jar %s %s -jnlpUrl %s";
-    private static final String WIN_AGENT_COMMAND_FORMAT = 
-        "%%JAVA_HOME%%/bin/java -DHUDSON_HOME=jenkins -server -Xmx%dm %s -jar %%MESOS_SANDBOX%%/agent.jar %s %s -jnlpUrl %s";
+    private static final String SLAVE_COMMAND_FORMAT = "java -DHUDSON_HOME=jenkins -server -Xmx%dm %s -jar ${MESOS_SANDBOX-.}/agent.jar %s %s -jnlpUrl %s";
+    private static final String WIN_AGENT_COMMAND_FORMAT = "%%JAVA_HOME%%/bin/java -DHUDSON_HOME=jenkins -server -Xmx%dm %s -jar %%MESOS_SANDBOX%%/agent.jar %s %s -jnlpUrl %s";
     private static final String JNLP_SECRET_FORMAT = "-secret %s";
     public static final String PORT_RESOURCE_NAME = "ports";
     public static final String MESOS_DEFAULT_ROLE = "*";
@@ -73,6 +84,7 @@ public class JenkinsScheduler implements Scheduler {
     private final boolean multiThreaded;
 
     private Queue<Request> requests;
+    private final ReentrantLock REQUESTS_LOCK = new ReentrantLock();
     private Set<String> unmatchedLabels;
     private Map<TaskID, Result> results;
     private Set<TaskID> finishedTasks;
@@ -85,7 +97,7 @@ public class JenkinsScheduler implements Scheduler {
 
     private static final Logger LOGGER = Logger.getLogger(JenkinsScheduler.class.getName());
 
-    public static final Lock SUPERVISOR_LOCK = new ReentrantLock();
+    public static final ReentrantLock SUPERVISOR_LOCK = new ReentrantLock();
 
     private static int lruCacheSize = Integer.getInteger(JenkinsScheduler.class.getName() + ".lruCacheSize", 10);
 
@@ -93,7 +105,7 @@ public class JenkinsScheduler implements Scheduler {
 
     private static final Object IGNORE = new Object();
 
-    private static final OfferQueue offerQueue = new OfferQueue();
+    private final OfferQueue offerQueue = new OfferQueue();
     private Thread offerProcessingThread = null;
     private volatile FrameworkID frameworkId;
 
@@ -142,6 +154,7 @@ public class JenkinsScheduler implements Scheduler {
         } else {
             driver = new MesosSchedulerDriver(JenkinsScheduler.this, framework, mesosCloud.getMaster());
         }
+
         // Start the framework.
         Thread frameworkThread = new Thread(new Runnable() {
             @Override
@@ -156,33 +169,33 @@ public class JenkinsScheduler implements Scheduler {
                 } catch (RuntimeException e) {
                     LOGGER.log(Level.SEVERE, "Caught a RuntimeException", e);
                 } finally {
-                    SUPERVISOR_LOCK.lock();
-                    if (driver != null) {
-                        driver.abort();
-                    }
-                    driver = null;
                     running = false;
-                    SUPERVISOR_LOCK.unlock();
+                    SUPERVISOR_LOCK.lock();
+                    try {
+                        if (driver != null) {
+                            driver.abort();
+                        }
+                        driver = null;
+                    } finally {
+                        SUPERVISOR_LOCK.unlock();
+                    }
                 }
             }
-        });
-
-        frameworkThread.setName("mesos-framework-thread");
+        }, String.format("mesos-framework-thread-%d", startedTime));
         frameworkThread.setDaemon(true);
-
         frameworkThread.start();
     }
 
     public synchronized void stop() {
+        running = false;
+        SUPERVISOR_LOCK.lock();
         try {
-            SUPERVISOR_LOCK.lock();
             if (driver != null) {
                 LOGGER.info("Stopping Mesos driver.");
                 driver.stop();
             } else {
                 LOGGER.warning("Unable to stop Mesos driver:  driver is null.");
             }
-            running = false;
         } finally {
             SUPERVISOR_LOCK.unlock();
         }
@@ -195,7 +208,12 @@ public class JenkinsScheduler implements Scheduler {
     public synchronized void requestJenkinsSlave(Mesos.SlaveRequest request, Mesos.SlaveResult result) {
         Metrics.metricRegistry().meter("mesos.scheduler.slave.requests").mark();
         LOGGER.fine("Enqueuing jenkins slave request");
-        requests.add(new Request(request, result));
+        REQUESTS_LOCK.lock();
+        try {
+            requests.add(new Request(request, result));
+        } finally {
+            REQUESTS_LOCK.unlock();
+        }
         if (driver != null) {
             // Ask mesos to send all offers, even the those we declined earlier.
             // See comment in resourceOffers() for further details.
@@ -265,19 +283,21 @@ public class JenkinsScheduler implements Scheduler {
             // resulting in scheduling the slave and resulting in orphaned task/slave not
             // monitored
             // by Jenkins.
-
-            for (Request request : requests) {
-                if (request.request.slave.name.equals(name)) {
-                    LOGGER.info("Removing enqueued mesos task " + name);
-                    requests.remove(request);
-                    // Also signal the Thread of the MesosComputerLauncher.launch() to exit from
-                    // latch.await()
-                    // Otherwise the Thread will stay in WAIT forever -> Leak!
-                    request.result.failed(request.request.slave);
-                    return;
+            REQUESTS_LOCK.lock();
+            try {
+                for (Request request : requests) {
+                    if (request.request.slave.name.equals(name)) {
+                        LOGGER.info("Removing enqueued mesos task " + name);
+                        requests.remove(request);
+                        // Also signal the Thread of the MesosComputerLauncher.launch() to exit from latch.await()
+                        // Otherwise the Thread will stay in WAIT forever -> Leak!
+                        request.result.failed(request.request.slave);
+                        return;
+                    }
                 }
+            } finally {
+                REQUESTS_LOCK.unlock();
             }
-
             LOGGER.warning("Asked to kill unknown mesos task " + taskId);
         }
 
@@ -309,13 +329,36 @@ public class JenkinsScheduler implements Scheduler {
 
     private void declineShort(Offer offer) {
         Metrics.metricRegistry().meter("mesos.scheduler.decline.short").mark();
+
+        if (offer.hasSlaveId()) {
+            Metrics.metricRegistry().meter("mesos.scheduler.decline.short." + offer.getSlaveId().getValue()).mark();
+        }
+
         declineOffer(offer, MesosCloud.SHORT_DECLINE_OFFER_DURATION_SEC);
     }
 
     private void declineOffer(Offer offer, double duration) {
-        LOGGER.fine("Rejecting offer " + offer.getId().getValue() + " for " + duration + " seconds");
+        LOGGER.info(String.format("Declining offer %s for %s seconds", offer.getId().getValue(), duration));
         Filters filters = Filters.newBuilder().setRefuseSeconds(duration).build();
         driver.declineOffer(offer.getId(), filters);
+    }
+
+    private void reviveOffers() {
+        if (driver != null) {
+            LOGGER.info("Reviving offers");
+            Timer.Context ctx = Metrics.metricRegistry().timer("mesos.scheduler.revives").time();
+            driver.reviveOffers();
+            ctx.stop();
+        }
+    }
+
+    private void suppressOffers() {
+        if (driver != null) {
+            LOGGER.info("Suppressing offers");
+            Timer.Context ctx = Metrics.metricRegistry().timer("mesos.scheduler.suppresses").time();
+            driver.suppressOffers();
+            ctx.stop();
+        }
     }
 
     private void processOffers() {
@@ -324,35 +367,36 @@ public class JenkinsScheduler implements Scheduler {
         reArrangeOffersBasedOnAffinity(offers);
         int processedRequests = 0;
         for (Offer offer : offers) {
-            if (offer == null) {
-                LOGGER.warning("Null offer!!");
-                continue;
-            }
+            boolean answered = false;
             Metrics.metricRegistry().meter("mesos.scheduler.offer.processed").mark();
             final Timer.Context offerContext = Metrics.metricRegistry().timer("mesos.scheduler.offer.processing.time")
                     .time();
+            REQUESTS_LOCK.lock();
             try {
-                if (requests.isEmpty() && !buildsInQueue(Jenkins.getInstance().getQueue())) {
-                    unmatchedLabels.clear();
+                if (requests.isEmpty()) {
                     // Decline offer for a longer period if no slave is waiting to get spawned.
                     // This prevents unnecessarily getting offers every few seconds and causing
                     // starvation when running a lot of frameworks.
                     Metrics.metricRegistry().meter("mesos.scheduler.decline.long").mark();
-                    LOGGER.info("No slave in queue.");
+
+                    if (offer.hasSlaveId()) {
+                        Metrics.metricRegistry().meter("mesos.scheduler.decline.long." + offer.getSlaveId().getValue())
+                                .mark();
+                    }
                     declineOffer(offer, mesosCloud.getDeclineOfferDurationDouble());
+                    answered = true;
                     continue;
                 }
 
                 boolean taskCreated = false;
-
                 if (isOfferAvailable(offer)) {
                     for (Request request : requests) {
-                        // TODO: Dirty modification of list while traversing it.
                         if (matches(offer, request)) {
                             Timer.Context ctx = Metrics.metricRegistry().timer("mesos.scheduler.offer.matched").time();
                             LOGGER.info("Offer matched! Creating mesos task " + request.request.slave.name);
                             try {
                                 createMesosTask(offer, request);
+                                answered = true;
                                 unmatchedLabels.remove(request.request.slaveInfo.getLabelString());
                                 taskCreated = true;
                                 recentlyAcceptedOffers.put(offer.getSlaveId().getValue(), IGNORE);
@@ -372,9 +416,13 @@ public class JenkinsScheduler implements Scheduler {
 
                 if (!taskCreated) {
                     declineShort(offer);
-                    continue;
+                    answered = true;
                 }
             } finally {
+                REQUESTS_LOCK.unlock();
+                if (!answered) {
+                    declineShort(offer);
+                }
                 offerContext.stop();
             }
         }
@@ -391,8 +439,20 @@ public class JenkinsScheduler implements Scheduler {
                         + " pending requests)");
             }
         }
-        for (Request request : requests) {
-            unmatchedLabels.add(request.request.slaveInfo.getLabelString());
+        REQUESTS_LOCK.lock();
+        try {
+            for (Request request : requests) {
+                unmatchedLabels.add(request.request.slaveInfo.getLabelString());
+            }
+        } finally {
+            REQUESTS_LOCK.unlock();
+        }
+
+        // Note that even if the suppress call is dropped on the way to the master it is ok
+        // because we will do this check again when processing a subsequent offer.
+        if (offers.size() > 0 && requests.isEmpty()) {
+            unmatchedLabels.clear();
+            suppressOffers();
         }
     }
 
@@ -406,11 +466,19 @@ public class JenkinsScheduler implements Scheduler {
 
         for (Protos.Offer offer : offers) {
             boolean queued = offerQueue.offer(offer);
+
+            // Track offers received per agent
+            if (offer.hasSlaveId()) {
+                Metrics.metricRegistry().meter("mesos.scheduler.offers.received." + offer.getSlaveId().getValue())
+                        .mark();
+            }
+
             if (!queued) {
                 LOGGER.warning("Offer queue is full.");
                 declineShort(offer);
             } else {
-                LOGGER.info("Queued offer " + offer.getId().getValue());
+                LOGGER.info(String.format("Queued offer %s from %s", offer.getId().getValue(),
+                        offer.getSlaveId().getValue()));
             }
         }
 
@@ -438,8 +506,14 @@ public class JenkinsScheduler implements Scheduler {
             public void run() {
                 LOGGER.info("Started offer processing thread: " + threadName);
                 try {
-                    while (true) {
+                    while (isRunning()) {
                         processOffers();
+
+                        // By periodically doing this check we guard against the case that reviveOffers()
+                        // called from requestJenkinsSlave() got dropped before reaching the master.
+                        if (!requests.isEmpty()) {
+                            reviveOffers();
+                        }
                     }
                 } catch (Throwable t) {
                     LOGGER.severe("Offer processing thread failed with exception: " + ExceptionUtils.getStackTrace(t));
@@ -602,7 +676,7 @@ public class JenkinsScheduler implements Scheduler {
                     ? StringUtils.join(containerInfo.getPortMappings().toArray(), "/")
                     : "";
 
-            LOGGER.fine("Offer not sufficient for slave request:\n" + offer.getResourcesList().toString() + "\n"
+            LOGGER.info("Offer not sufficient for slave request:\n" + offer.getResourcesList().toString() + "\n"
                     + offer.getAttributesList().toString() + "\nRequested for Jenkins slave:\n" + "  cpus:  "
                     + requestedCpus + "\n" + "  mem:   " + requestedMem + "\n" + "  ports: " + requestedPorts + "\n"
                     + "  attributes:  " + (slaveAttributes == null ? "" : slaveAttributes.toString()));
@@ -636,22 +710,19 @@ public class JenkinsScheduler implements Scheduler {
         // Accept any and all Mesos slave offers by default.
         boolean slaveTypeMatch = true;
 
-        // Collect the list of attributes from the offer as key-value pairs
-        Map<String, String> attributesMap = new HashMap<String, String>();
-        for (Attribute attribute : offer.getAttributesList()) {
-            attributesMap.put(attribute.getName(), attribute.getText().getValue());
-        }
-
         if (slaveAttributes != null && slaveAttributes.size() > 0) {
+            //Collect the list of attributes from the offer as key-value pairs
+            Map<String, String> attributesMap = new HashMap<String, String>();
+            for (Attribute attribute : offer.getAttributesList()) {
+                attributesMap.put(attribute.getName(), attribute.getText().getValue());
+            }
 
             // Iterate over the cloud attributes to see if they exist in the offer
             // attributes list.
             Iterator iterator = slaveAttributes.keys();
             while (iterator.hasNext()) {
-
                 String key = (String) iterator.next();
-
-                // If there is a single absent attribute then we should reject this offer.
+                //If there is a single absent attribute then we should reject this offer.
                 if (!(attributesMap.containsKey(key)
                         && attributesMap.get(key).toString().equals(slaveAttributes.getString(key)))) {
                     slaveTypeMatch = false;
@@ -752,6 +823,8 @@ public class JenkinsScheduler implements Scheduler {
         CommandInfo.Builder commandBuilder = getCommandInfoBuilder(request);
         TaskInfo.Builder taskBuilder = getTaskInfoBuilder(offer, request, taskId, commandBuilder);
 
+        LOGGER.info(String.format("ContainerInfo: %s", request.request.slaveInfo.getContainerInfo()));
+
         if (request.request.slaveInfo.getContainerInfo() != null) {
             getContainerInfoBuilder(offer, request, slaveName, taskBuilder);
         }
@@ -761,6 +834,14 @@ public class JenkinsScheduler implements Scheduler {
 
         Metrics.metricRegistry().counter("mesos.scheduler.operation.launch").inc(tasks.size());
         Filters filters = Filters.newBuilder().setRefuseSeconds(1).build();
+
+        for (TaskInfo taskInfo : tasks) {
+            LOGGER.info(String.format("Launching TaskInfo: %s", TextFormat.shortDebugString(taskInfo)));
+        }
+
+        request.request.mesosSlave.provisionedToMesos();
+        LOGGER.info(String.format("Slave %s now being provisioned by Mesos", request.request.mesosSlave.getUuid()));
+
         driver.launchTasks(offer.getId(), tasks, filters);
 
         results.put(taskId, new Result(request.result, new Mesos.JenkinsSlave(offer.getSlaveId().getValue())));
@@ -822,8 +903,7 @@ public class JenkinsScheduler implements Scheduler {
         MesosSlaveInfo.ContainerInfo containerInfo = request.request.slaveInfo.getContainerInfo();
         ContainerInfo.Type containerType = ContainerInfo.Type.valueOf(containerInfo.getType());
 
-        ContainerInfo.Builder containerInfoBuilder = ContainerInfo.newBuilder() //
-                .setType(containerType); //
+        ContainerInfo.Builder containerInfoBuilder = ContainerInfo.newBuilder().setType(containerType);
 
         switch (containerType) {
         case DOCKER:
@@ -921,25 +1001,19 @@ public class JenkinsScheduler implements Scheduler {
         return commandBuilder;
     }
 
-    String generateJenkinsCommand2Run(int jvmMem,String jvmArgString,String jnlpArgString,String slaveName, boolean isWindows) {
+    String generateJenkinsCommand2Run(int jvmMem, String jvmArgString, String jnlpArgString, String slaveName,
+            boolean isWindows) {
 
-        return String.format(isWindows ? WIN_AGENT_COMMAND_FORMAT : SLAVE_COMMAND_FORMAT,
-                jvmMem,
-                jvmArgString,
-                jnlpArgString,
-                getJnlpSecret(slaveName),
-                getJnlpUrl(slaveName));
+        return String.format(isWindows ? WIN_AGENT_COMMAND_FORMAT : SLAVE_COMMAND_FORMAT, jvmMem, jvmArgString,
+                jnlpArgString, getJnlpSecret(slaveName), getJnlpUrl(slaveName));
     }
 
     private CommandInfo.Builder getBaseCommandBuilder(Request request) {
 
         CommandInfo.Builder commandBuilder = CommandInfo.newBuilder();
-        String jenkinsCommand2Run = generateJenkinsCommand2Run(
-                request.request.slaveInfo.getSlaveMem(),
-                request.request.slaveInfo.getJvmArgs(),
-                request.request.slaveInfo.getJnlpArgs(),
-                request.request.slave.name,
-                request.request.slaveInfo.isWindowsAgent());
+        String jenkinsCommand2Run = generateJenkinsCommand2Run(request.request.slaveInfo.getSlaveMem(),
+                request.request.slaveInfo.getJvmArgs(), request.request.slaveInfo.getJnlpArgs(),
+                request.request.slave.name, request.request.slaveInfo.isWindowsAgent());
 
         if (request.request.slaveInfo.getContainerInfo() != null
                 && request.request.slaveInfo.getContainerInfo().getUseCustomDockerCommandShell()) {
@@ -1119,8 +1193,8 @@ public class JenkinsScheduler implements Scheduler {
      * JenkinsScheduler's request queue is empty.
      */
     public static void supervise() {
+        SUPERVISOR_LOCK.lock();
         try {
-            SUPERVISOR_LOCK.lock();
             Collection<Mesos> clouds = Mesos.getAllClouds();
             for (Mesos cloud : clouds) {
                 try {

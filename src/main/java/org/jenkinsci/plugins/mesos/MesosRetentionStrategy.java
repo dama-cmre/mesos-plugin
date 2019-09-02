@@ -52,12 +52,11 @@ public class MesosRetentionStrategy extends RetentionStrategy<MesosComputer> {
   public long check(MesosComputer c) {
     if (!computerCheckLock.tryLock()) {
       return 1;
-    } else {
-      try {
-        return checkInternal(c);
-      } finally {
-        computerCheckLock.unlock();
-      }
+    }
+    try {
+      return checkInternal(c);
+    } finally {
+      computerCheckLock.unlock();
     }
   }
 
@@ -70,6 +69,13 @@ public class MesosRetentionStrategy extends RetentionStrategy<MesosComputer> {
   private long checkInternal(MesosComputer c) {
     MesosSlave node = c.getNode();
     if (node == null || node.isPendingDelete()) {
+      return 1;
+    }
+
+    // Terminate if the computer is idle and a single-use agent.
+    if (c.isIdle() && c.isOffline() && node.isSingleUse()) {
+      LOGGER.info("Disconnecting single-use computer " + c.getName());
+      node.setPendingDelete(true);
       return 1;
     }
 

@@ -61,7 +61,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 public class MesosCloud extends Cloud {
-  private static final String DEFAULT_DECLINE_OFFER_DURATION = "600000"; // 10 mins.
+  private static final String DEFAULT_DECLINE_OFFER_DURATION = "600"; // 10 mins.
   public static final double SHORT_DECLINE_OFFER_DURATION_SEC = 5;
   private String nativeLibraryPath;
   private String master;
@@ -367,14 +367,13 @@ public class MesosCloud extends Cloud {
   public StandardUsernamePasswordCredentials getCredentials() {
     if (credentialsId == null) {
       return null;
-    } else {
-      List<DomainRequirement> domainRequirements = (master == null) ? Collections.<DomainRequirement>emptyList()
-          : URIRequirementBuilder.fromUri(master.trim()).build();
-      Jenkins jenkins = getJenkins();
-      return CredentialsMatchers.firstOrNull(CredentialsProvider
-          .lookupCredentials(StandardUsernamePasswordCredentials.class, jenkins, ACL.SYSTEM, domainRequirements),
-          CredentialsMatchers.withId(credentialsId));
     }
+    List<DomainRequirement> domainRequirements = (master == null) ? Collections.<DomainRequirement>emptyList()
+        : URIRequirementBuilder.fromUri(master.trim()).build();
+    Jenkins jenkins = getJenkins();
+    return CredentialsMatchers.firstOrNull(CredentialsProvider
+        .lookupCredentials(StandardUsernamePasswordCredentials.class, jenkins, ACL.SYSTEM, domainRequirements),
+        CredentialsMatchers.withId(credentialsId));
   }
 
   private String getMetricName(Label label, String method, String metric) {
@@ -385,6 +384,7 @@ public class MesosCloud extends Cloud {
   @Override
   public Collection<PlannedNode> provision(Label label, int excessWorkload) {
     Metrics.metricRegistry().meter(getMetricName(label, "provision", "request")).mark(excessWorkload);
+    LOGGER.info(String.format("Received request to provision %d executors for label %s", excessWorkload, label));
 
     List<PlannedNode> list = new ArrayList<PlannedNode>();
     final MesosSlaveInfo slaveInfo = getSlaveInfo(slaveInfos, label);
@@ -413,20 +413,21 @@ public class MesosCloud extends Cloud {
         LOGGER.info("Provisioning Jenkins Slave on Mesos with " + numExecutors
             + " executors. Remaining excess workload: " + excessWorkload + " executors)");
 
-        // Create a context that can be passed down through the provisioning process and
-        // finalized when
-        // the request is completely fulfilled.
-        Timer.Context context = Metrics.metricRegistry().timer(getMetricName(label, "provision", "submit")).time();
+        MesosSlave mesosSlave = doProvision(numExecutors, slaveInfo,
+            Metrics.metricRegistry().timer(getMetricName(label, "provision", "ready")).time(),
+            Metrics.metricRegistry().timer(getMetricName(label, "provision", "scheduler")).time(),
+            Metrics.metricRegistry().timer(getMetricName(label, "provision", "mesos")));
+        LOGGER.info(String.format("Slave to be provisioned is %s", mesosSlave.getUuid()));
+
         list.add(new PlannedNode(this.getDisplayName(), Computer.threadPoolForRemoting.submit(new Callable<Node>() {
           public Node call() throws Exception {
-            MesosSlave s = doProvision(numExecutors, slaveInfo, context);
-
             // We do not need to explicitly add the Node here because that is handled by
             // hudson.slaves.NodeProvisioner::update() that checks the result from the
             // Future and adds the node. Though there is duplicate node addition check
             // because of this early addition there is difference in job scheduling and
             // best to avoid it.
-            return s;
+            LOGGER.info(String.format("Slave %s pulled by thread.", mesosSlave.getUuid()));
+            return mesosSlave;
           }
         }), numExecutors));
       }
@@ -437,10 +438,10 @@ public class MesosCloud extends Cloud {
     return list;
   }
 
-  private MesosSlave doProvision(int numExecutors, MesosSlaveInfo slaveInfo, Timer.Context provisioningContext)
-      throws Descriptor.FormException, IOException {
+  private MesosSlave doProvision(int numExecutors, MesosSlaveInfo slaveInfo, Timer.Context provisionToReady,
+      Timer.Context provisionToMesos, Timer mesosToReady) throws Descriptor.FormException, IOException {
     return new MesosSlave(this, MesosUtils.buildNodeName(slaveInfo.getLabelString()), numExecutors, slaveInfo,
-        provisioningContext);
+        provisionToReady, provisionToMesos, mesosToReady);
   }
 
   public List<MesosSlaveInfo> getSlaveInfos() {
@@ -702,10 +703,10 @@ public class MesosCloud extends Cloud {
         this.declineOfferDuration = DEFAULT_DECLINE_OFFER_DURATION;
       } else {
         double duration = Double.parseDouble(declineOfferDuration);
-        if (duration >= 1000) {
+        if (duration >= 1) {
           this.declineOfferDuration = declineOfferDuration;
         } else {
-          LOGGER.warning("Minimum declineOfferDuration (1000) > " + declineOfferDuration + ". Using default "
+          LOGGER.warning("Minimum declineOfferDuration (1) > " + declineOfferDuration + ". Using default "
               + DEFAULT_DECLINE_OFFER_DURATION + " ms.");
           this.declineOfferDuration = DEFAULT_DECLINE_OFFER_DURATION;
         }
